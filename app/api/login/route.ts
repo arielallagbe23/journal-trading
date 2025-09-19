@@ -1,6 +1,10 @@
 // app/api/login/route.ts
 export const runtime = "nodejs";
 
+// app/login/page.tsx
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store"; // optionnel
+
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { findUserByEmail } from "@/lib/users"; // <- sans "s"
