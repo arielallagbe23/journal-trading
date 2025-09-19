@@ -5,20 +5,24 @@ import { requireUserId } from "@/lib/requireUserId";
 import { getPlanById } from "@/lib/plans";
 import { getStepById, updateStep, deleteStep } from "@/lib/steps";
 
-export async function PATCH(req: NextRequest, { params }: { params: { stepId: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ stepId: string }> } // 👈 Promise
+) {
+  const { stepId } = await params; // 👈 await
   let uid: string;
   try { uid = requireUserId(req); }
   catch { return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 }); }
 
   try {
-    const step = await getStepById(params.stepId);
+    const step = await getStepById(stepId);
     if (!step) return NextResponse.json({ error: "STEP_NOT_FOUND" }, { status: 404 });
 
     const plan = await getPlanById(step.planId);
     if (!plan || plan.userId !== uid) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
     const patch = await req.json();
-    const updated = await updateStep(params.stepId, patch);
+    const updated = await updateStep(stepId, patch);
     return NextResponse.json({ ok: true, step: updated });
   } catch (e) {
     console.error("PATCH step failed:", e);
@@ -26,19 +30,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { stepId: st
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { stepId: string } }) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ stepId: string }> } // 👈 Promise
+) {
+  const { stepId } = await params; // 👈 await
   let uid: string;
   try { uid = requireUserId(req); }
   catch { return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 }); }
 
   try {
-    const step = await getStepById(params.stepId);
+    const step = await getStepById(stepId);
     if (!step) return NextResponse.json({ error: "STEP_NOT_FOUND" }, { status: 404 });
 
     const plan = await getPlanById(step.planId);
     if (!plan || plan.userId !== uid) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
-    await deleteStep(params.stepId);
+    await deleteStep(stepId);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("DELETE step failed:", e);

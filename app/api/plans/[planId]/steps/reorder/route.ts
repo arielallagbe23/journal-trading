@@ -13,7 +13,12 @@ function chunk<T>(arr: T[], size: number) {
   return out;
 }
 
-export async function POST(req: NextRequest, { params }: { params: { planId: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ planId: string }> } // 👈 Promise
+) {
+  const { planId } = await params; // 👈 await
+
   // 1) Auth stricte
   let uid: string;
   try { uid = requireUserId(req); }
@@ -21,8 +26,10 @@ export async function POST(req: NextRequest, { params }: { params: { planId: str
 
   try {
     // 2) Ownership
-    const plan = await getPlanById(params.planId);
-    if (!plan || plan.userId !== uid) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    const plan = await getPlanById(planId);
+    if (!plan || plan.userId !== uid) {
+      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    }
 
     // 3) Parse
     const { stepIds } = await req.json();
@@ -31,26 +38,26 @@ export async function POST(req: NextRequest, { params }: { params: { planId: str
     }
 
     // 4) Restreindre aux steps du plan
-    const existing = await getStepsByPlan(params.planId); // Firestore
-    const allowed = new Set(existing.map(s => s.id));
+    const existing = await getStepsByPlan(planId);
+    const allowed = new Set(existing.map((s) => s.id));
 
     // 5) Prépare les updates (order = 1..n)
-    const updates = stepIds
-      .filter(id => allowed.has(id))
-      .map((id, i) => ({ id, order: i + 1 }));
+    const updates = stepIds.filter((id: string) => allowed.has(id)).map((id: string, i: number) => ({
+      id,
+      order: i + 1,
+    }));
 
     // 6) Batch Firestore (chunk <= 450 pour marge)
     for (const group of chunk(updates, 450)) {
       const batch = adminDb.batch();
       for (const u of group) {
-        const ref = adminDb.collection("steps").doc(u.id);
-        batch.update(ref, { order: u.order });
+        batch.update(adminDb.collection("steps").doc(u.id), { order: u.order });
       }
       await batch.commit();
     }
 
     // 7) Retourne la liste réordonnée
-    const steps = await getStepsByPlan(params.planId);
+    const steps = await getStepsByPlan(planId);
     return NextResponse.json({ ok: true, steps });
   } catch (e) {
     console.error("REORDER steps failed:", e);

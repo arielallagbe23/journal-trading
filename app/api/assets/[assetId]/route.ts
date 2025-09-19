@@ -1,22 +1,21 @@
 export const runtime = "nodejs";
-// app/api/asset/[assetId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { requireUserId } from "@/lib/requireUserId";
-import { getAssetById, removeAsset } from "@/lib/assets";
+import { adminDb } from "@/lib/firebase-admin";
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { assetId: string } }
+  { params }: { params: Promise<{ assetId: string }> }
 ) {
+  const { assetId } = await params; // 👈
   try {
-    const userId = requireUserId(req);
-
-    const a = await getAssetById(params.assetId); // <-- Firestore
+    const userId = await requireUserId(req);
+    const doc = await adminDb.collection("assets").doc(assetId).get();
+    const a = doc.exists ? doc.data() as any : null;
     if (!a || a.userId !== userId) {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     }
-
-    await removeAsset(params.assetId); // <-- Firestore
+    await adminDb.collection("assets").doc(assetId).delete();
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
