@@ -1,4 +1,3 @@
-// app/login/LoginClient.tsx
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -6,7 +5,7 @@ import { useState, FormEvent, ChangeEvent } from "react";
 
 export default function LoginClient() {
   const router = useRouter();
-  const search = useSearchParams(); // 👈 OK, on est dans un client component sous Suspense
+  const search = useSearchParams(); // ✅ OK dans un client component
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,13 +18,14 @@ export default function LoginClient() {
     setMsg(null);
     setIsError(false);
     setLoading(true);
+
     try {
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Erreur inconnue");
       router.replace("/dashboard");
     } catch (err) {
