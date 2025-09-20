@@ -1,8 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, History } from "lucide-react";
+import {
+  ArrowLeft,
+  History,
+  ChevronDown,
+  ChevronUp,
+  ArrowUpRight,
+  ArrowDownRight,
+} from "lucide-react";
 
 type Tx = {
   id: string;
@@ -15,8 +22,8 @@ type Tx = {
   profit: number | null;
   emotionBefore?: string | null;
   emotionAfter?: string | null;
-  respectPlan?: number; // 0..100
-  confidence?: boolean | null; // oui/non/null
+  respectPlan?: number;
+  confidence?: boolean | null;
 };
 
 export default function HistoryPage() {
@@ -24,12 +31,13 @@ export default function HistoryPage() {
   const [closedTx, setClosedTx] = useState<Tx[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+
   const [page, setPage] = useState(1);
-const perPage = 10;
+  const perPage = 10;
+  const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
 
-const totalPages = Math.ceil(closedTx.length / perPage);
-const paginatedTx = closedTx.slice((page - 1) * perPage, page * perPage);
-
+  const totalPages = Math.ceil(closedTx.length / perPage);
+  const paginatedTx = closedTx.slice((page - 1) * perPage, page * perPage);
 
   useEffect(() => {
     (async () => {
@@ -54,10 +62,51 @@ const paginatedTx = closedTx.slice((page - 1) * perPage, page * perPage);
     })();
   }, []);
 
+  function fmtDate(dt?: string | null) {
+    if (!dt) return "—";
+    try {
+      return new Date(dt).toLocaleString("fr-FR", {
+        dateStyle: "short",
+        timeStyle: "short",
+      });
+    } catch {
+      return "—";
+    }
+  }
+
+  function resultPill(result: Tx["result"]) {
+    if (!result) return "—";
+    const isWin = result === "win";
+    return (
+      <span
+        className={`px-2 py-1 rounded text-xs ${
+          isWin ? "bg-emerald-600/20 text-emerald-300" : "bg-rose-600/20 text-rose-300"
+        }`}
+      >
+        {isWin ? "Win" : "Loss"}
+      </span>
+    );
+  }
+
+  function fmtProfit(t: Tx) {
+    if (typeof t.profit !== "number") return "—";
+    const val = Math.abs(t.profit).toFixed(2);
+    if (t.result === "win") return <span className="text-emerald-300">+{val}</span>;
+    if (t.result === "loss") return <span className="text-rose-300">-{val}</span>;
+    return (
+      <span className={t.profit >= 0 ? "text-emerald-300" : "text-rose-300"}>
+        {t.profit.toFixed(2)}
+      </span>
+    );
+  }
+
+  function toggleRow(id: string) {
+    setOpenRows((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
   return (
     <main className="min-h-screen p-4 bg-gray-950 text-gray-100">
-      <div className="max-w-4xl mx-auto grid gap-6">
-        {/* Header */}
+      <div className="max-w-xl mx-auto grid gap-6">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push("/transactions")}
@@ -68,7 +117,7 @@ const paginatedTx = closedTx.slice((page - 1) * perPage, page * perPage);
           </button>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <History className="w-6 h-6 text-indigo-400" />
-            Historique des transactions
+            Historique transactions
           </h1>
         </div>
 
@@ -78,130 +127,122 @@ const paginatedTx = closedTx.slice((page - 1) * perPage, page * perPage);
           ) : err ? (
             <p className="text-rose-400 text-sm">{err}</p>
           ) : closedTx.length === 0 ? (
-            <p className="text-gray-400 text-sm">
-              Aucune transaction clôturée.
-            </p>
+            <p className="text-gray-400 text-sm">Aucune transaction clôturée.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-hidden">
+              {/* Mobile-first: 3 colonnes -> Actif / Sortie / Résultat */}
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="text-left text-gray-400">
-                    <th className="py-2 px-2">Actif</th>
-                    <th className="py-2 px-2">TF</th>
-                    <th className="py-2 px-2">Entrée</th>
-                    <th className="py-2 px-2">Sortie</th>
-                    <th className="py-2 px-2">Résultat</th>
-                    <th className="py-2 px-2">Profit</th>
-                    <th className="py-2 px-2">Respect</th>
-                    <th className="py-2 px-2">Confiance</th>
-                    <th className="py-2 px-2">Avant</th>
-                    <th className="py-2 px-2">Après</th>
+                    <th className="py-2 px-2 w-[20%] text-center">Actif</th>
+                    <th className="py-2 px-2 w-[50%] text-center">Sortie</th>
+                    <th className="py-2 px-2 w-[30%] text-center">Résultat</th>
                   </tr>
                 </thead>
                 <tbody>
-  {paginatedTx.map((t) => (
-    <tr
-      key={t.id}
-      className="border-t border-gray-800 hover:bg-gray-800/30 transition"
-    >
-                      <td className="py-2 px-2">{t.asset}</td>
-                      <td className="py-2 px-2">{t.timeframe}</td>
-                      <td className="py-2 px-2">
-                        {new Date(t.dateIn).toLocaleString("fr-FR", {
-                          dateStyle: "short",
-                          timeStyle: "short",
-                        })}
-                      </td>
-                      <td className="py-2 px-2">
-                        {t.dateOut
-                          ? new Date(t.dateOut).toLocaleString("fr-FR", {
-                              dateStyle: "short",
-                              timeStyle: "short",
-                            })
-                          : "—"}
-                      </td>
-                      <td className="py-2 px-2">
-                        {t.result ? (
-                          <span
-                            className={`px-2 py-1 rounded text-xs ${
-                              t.result === "win"
-                                ? "bg-emerald-600/20 text-emerald-300"
-                                : "bg-rose-600/20 text-rose-300"
-                            }`}
-                          >
-                            {t.result === "win" ? "Win" : "Loss"}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="py-2 px-2">
-                        {typeof t.profit === "number" && t.result ? (
-                          t.result === "win" ? (
-                            <span className="text-emerald-300">
-                              +{Math.abs(t.profit).toFixed(2)}
+                  {paginatedTx.map((t) => {
+                    const open = !!openRows[t.id];
+                    return (
+                      <Fragment key={t.id}>
+                        <tr
+                          className="border-t border-gray-800 hover:bg-gray-800/30 cursor-pointer"
+                          onClick={() => toggleRow(t.id)}
+                          aria-expanded={open}
+                        >
+                          <td className="py-2 px-2 w-[20%] text-center">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate">{t.asset}</span>
+                              {t.result === "win" ? (
+                                <ArrowUpRight className="w-4 h-4 text-emerald-400" />
+                              ) : t.result === "loss" ? (
+                                <ArrowDownRight className="w-4 h-4 text-rose-400" />
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="py-2 px-2 w-[50%] text-center">{fmtDate(t.dateOut)}</td>
+                          <td className="py-2 px-2 w-[30%] text-center">
+                            {resultPill(t.result)}
+                            <span className="inline-block align-middle ml-1 text-gray-400">
+                              {open ? (
+                                <ChevronUp className="w-4 h-4 inline-block" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 inline-block" />
+                              )}
                             </span>
-                          ) : (
-                            <span className="text-rose-300">
-                              -{Math.abs(t.profit).toFixed(2)}
-                            </span>
-                          )
-                        ) : typeof t.profit === "number" ? (
-                          // au cas où on a un profit mais pas de result (fallback neutre)
-                          <span
-                            className={
-                              t.profit >= 0
-                                ? "text-emerald-300"
-                                : "text-rose-300"
-                            }
-                          >
-                            {t.profit.toFixed(2)}
-                          </span>
-                        ) : (
-                          "—"
+                          </td>
+                        </tr>
+
+                        {open && (
+                          <tr className="bg-gray-900/60 border-t border-gray-800">
+                            <td colSpan={3} className="px-2 pb-3 pt-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="rounded-lg border border-gray-800 p-2">
+                                  <div className="text-[11px] text-gray-400">Timeframe</div>
+                                  <div className="text-sm">{t.timeframe || "—"}</div>
+                                </div>
+                                <div className="rounded-lg border border-gray-800 p-2">
+                                  <div className="text-[11px] text-gray-400">Entrée</div>
+                                  <div className="text-sm">{fmtDate(t.dateIn)}</div>
+                                </div>
+                                <div className="rounded-lg border border-gray-800 p-2">
+                                  <div className="text-[11px] text-gray-400">Profit</div>
+                                  <div className="text-sm">{fmtProfit(t)}</div>
+                                </div>
+                                <div className="rounded-lg border border-gray-800 p-2">
+                                  <div className="text-[11px] text-gray-400">Respect du plan</div>
+                                  <div className="text-sm">
+                                    {typeof t.respectPlan === "number" ? `${t.respectPlan}%` : "—"}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg border border-gray-800 p-2">
+                                  <div className="text-[11px] text-gray-400">Confiance</div>
+                                  <div className="text-sm">
+                                    {t.confidence === true
+                                      ? "Oui"
+                                      : t.confidence === false
+                                      ? "Non"
+                                      : "—"}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg border border-gray-800 p-2">
+                                  <div className="text-[11px] text-gray-400">Émotion avant</div>
+                                  <div className="text-sm">{t.emotionBefore || "—"}</div>
+                                </div>
+                                <div className="rounded-lg border border-gray-800 p-2 col-span-2">
+                                  <div className="text-[11px] text-gray-400">Émotion après</div>
+                                  <div className="text-sm">{t.emotionAfter || "—"}</div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                      <td className="py-2 px-2">
-                        {typeof t.respectPlan === "number"
-                          ? `${t.respectPlan}%`
-                          : "—"}
-                      </td>
-                      <td className="py-2 px-2">
-                        {t.confidence === true
-                          ? "Oui"
-                          : t.confidence === false
-                          ? "Non"
-                          : "—"}
-                      </td>
-                      <td className="py-2 px-2">{t.emotionBefore || "—"}</td>
-                      <td className="py-2 px-2">{t.emotionAfter || "—"}</td>
-                    </tr>
-                  ))}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
 
               {totalPages > 1 && (
-  <div className="flex justify-center items-center gap-4 mt-4">
-    <button
-      onClick={() => setPage((p) => Math.max(1, p - 1))}
-      disabled={page === 1}
-      className="px-3 py-1 rounded bg-gray-800 text-gray-300 disabled:opacity-50"
-    >
-      ◀ Précédent
-    </button>
-    <span className="text-gray-400">
-      Page {page} / {totalPages}
-    </span>
-    <button
-      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-      disabled={page === totalPages}
-      className="px-3 py-1 rounded bg-gray-800 text-gray-300 disabled:opacity-50"
-    >
-      Suivant ▶
-    </button>
-  </div>
-)}
-
+                <div className="flex justify-center items-center gap-4 mt-4">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="px-3 py-1 rounded bg-gray-800 text-gray-300 disabled:opacity-50"
+                  >
+                    ◀ Précédent
+                  </button>
+                  <span className="text-gray-400">
+                    Page {page} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="px-3 py-1 rounded bg-gray-800 text-gray-300 disabled:opacity-50"
+                  >
+                    Suivant ▶
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </section>

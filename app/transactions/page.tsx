@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2, Folder } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Folder, ChevronDown } from "lucide-react";
 
 type Plan = { id: string; title: string };
 type Step = { id: string; title: string };
@@ -26,6 +26,29 @@ export default function TransactionsPage() {
   const [editEmotionAfter, setEditEmotionAfter] = useState("");
   const [editResult, setEditResult] = useState<"win" | "loss" | "">("");
   const [editProfit, setEditProfit] = useState<string>(""); // string pour l’input
+
+  // Select reset stylé, compatible iOS/Safari
+  function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+    const { className = "", ...rest } = props;
+    return (
+      <div className="relative">
+        <select
+          {...rest}
+          className={
+            "mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 text-gray-100 " +
+            "px-3 py-2 pr-9 outline-none appearance-none " + // <-- le cœur du fix
+            "focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40 " +
+            "disabled:opacity-60 " +
+            className
+          }
+        />
+        <ChevronDown
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+          aria-hidden="true"
+        />
+      </div>
+    );
+  }
 
   // liste des transactions ouvertes
   const [openTx, setOpenTx] = useState<
@@ -251,43 +274,38 @@ export default function TransactionsPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Asset */}
             <div>
+              {/* Asset */}
               <label className="block text-sm text-gray-300">Asset</label>
-              <select
-                value={asset}
-                onChange={(e) => setAsset(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-2 outline-none"
-              >
+              <Select value={asset} onChange={(e) => setAsset(e.target.value)}>
                 <option value="">-- Choisir un actif --</option>
                 {assets.map((a) => (
                   <option key={a.id} value={a.assetName}>
                     {a.assetName}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Timeframe */}
             <div>
               <label className="block text-sm text-gray-300">Timeframe</label>
-              <select
+              <Select
                 value={timeframe}
                 onChange={(e) => setTimeframe(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-2 outline-none"
               >
                 <option value="">-- Choisir un timeframe --</option>
                 <option value="H1">H1</option>
                 <option value="H4">H4</option>
                 <option value="D1">D1</option>
-              </select>
+              </Select>
             </div>
 
             {/* Plan */}
             <div>
               <label className="block text-sm text-gray-300">Plan</label>
-              <select
+              <Select
                 value={selectedPlan}
                 onChange={(e) => setSelectedPlan(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-2 outline-none"
               >
                 <option value="">-- Choisir un plan --</option>
                 {plans.map((p) => (
@@ -295,7 +313,7 @@ export default function TransactionsPage() {
                     {p.title}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Étapes */}
@@ -325,16 +343,15 @@ export default function TransactionsPage() {
               <label className="block text-sm text-gray-300">
                 Émotion avant
               </label>
-              <select
+              <Select
                 value={emotionBefore}
                 onChange={(e) => setEmotionBefore(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-2 outline-none"
               >
                 <option value="">-- Choisir une émotion --</option>
                 <option value="indecis">indecis</option>
                 <option value="confiant">confiant</option>
                 <option value="mitigé">mitigé</option>
-              </select>
+              </Select>
             </div>
 
             <button
@@ -411,10 +428,9 @@ export default function TransactionsPage() {
                               <label className="block text-xs text-gray-400">
                                 Asset
                               </label>
-                              <select
+                              <Select
                                 value={editAsset}
                                 onChange={(e) => setEditAsset(e.target.value)}
-                                className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-2 outline-none"
                               >
                                 <option value="">-- Choisir un actif --</option>
                                 {assets.map((a) => (
@@ -422,7 +438,7 @@ export default function TransactionsPage() {
                                     {a.assetName}
                                   </option>
                                 ))}
-                              </select>
+                              </Select>
                             </div>
 
                             {/* Timeframe */}
@@ -430,12 +446,11 @@ export default function TransactionsPage() {
                               <label className="block text-xs text-gray-400">
                                 Timeframe
                               </label>
-                              <select
+                              <Select
                                 value={editTimeframe}
                                 onChange={(e) =>
                                   setEditTimeframe(e.target.value)
                                 }
-                                className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-2 outline-none"
                               >
                                 <option value="">
                                   -- Choisir un timeframe --
@@ -444,7 +459,7 @@ export default function TransactionsPage() {
                                 <option value="H1">H1</option>
                                 <option value="H4">H4</option>
                                 <option value="D1">D1</option>
-                              </select>
+                              </Select>
                             </div>
 
                             {/* Émotion avant */}
@@ -452,12 +467,11 @@ export default function TransactionsPage() {
                               <label className="block text-xs text-gray-400">
                                 Émotion avant
                               </label>
-                              <select
+                              <Select
                                 value={editEmotionBefore}
                                 onChange={(e) =>
                                   setEditEmotionBefore(e.target.value)
                                 }
-                                className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-2 outline-none"
                               >
                                 <option value="">
                                   -- Choisir une émotion --
@@ -465,7 +479,7 @@ export default function TransactionsPage() {
                                 <option value="Confiant">😎 Confiant</option>
                                 <option value="Stressé">😬 Stressé</option>
                                 <option value="Indécis">🤔 Indécis</option>
-                              </select>
+                              </Select>
                             </div>
 
                             {/* Confiance stratégie */}
@@ -473,7 +487,7 @@ export default function TransactionsPage() {
                               <label className="block text-xs text-gray-400">
                                 Confiance stratégie
                               </label>
-                              <select
+                              <Select
                                 value={
                                   editConfidence === null
                                     ? ""
@@ -488,12 +502,11 @@ export default function TransactionsPage() {
                                       : e.target.value === "yes"
                                   )
                                 }
-                                className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-2 outline-none"
                               >
                                 <option value="">— Non renseigné —</option>
                                 <option value="yes">Oui</option>
                                 <option value="no">Non</option>
-                              </select>
+                              </Select>
                             </div>
 
                             {/* Émotion après */}
@@ -501,39 +514,37 @@ export default function TransactionsPage() {
                               <label className="block text-xs text-gray-400">
                                 Émotion après
                               </label>
-                              <select
+                              <Select
                                 value={editEmotionAfter}
                                 onChange={(e) =>
                                   setEditEmotionAfter(e.target.value)
                                 }
-                                className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-2 outline-none"
                               >
                                 <option value="">— Non renseigné —</option>
                                 <option value="Confiant">😎 Confiant</option>
                                 <option value="Stressé">😬 Stressé</option>
                                 <option value="Indécis">🤔 Indécis</option>
-                              </select>
+                              </Select>
                             </div>
 
-                            {/* Résultat & Profit (pour clôture) */}
+                            {/* Résultat & Profit */}
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <label className="block text-xs text-gray-400">
                                   Résultat
                                 </label>
-                                <select
+                                <Select
                                   value={editResult}
                                   onChange={(e) =>
                                     setEditResult(
                                       e.target.value as "win" | "loss" | ""
                                     )
                                   }
-                                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-2 outline-none"
                                 >
                                   <option value="">— N/A —</option>
                                   <option value="win">✅ Win</option>
                                   <option value="loss">❌ Loss</option>
-                                </select>
+                                </Select>
                               </div>
                               <div>
                                 <label className="block text-xs text-gray-400">
@@ -547,7 +558,7 @@ export default function TransactionsPage() {
                                     setEditProfit(e.target.value)
                                   }
                                   placeholder="ex: 12.50 ou -8"
-                                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-2 outline-none"
+                                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 text-gray-100 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40"
                                 />
                               </div>
                             </div>
