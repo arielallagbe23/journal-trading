@@ -135,6 +135,13 @@ export default function SignupPage() {
             {isError ? `Erreur: ${msg}` : msg}
           </p>
         )}
+
+        {/* 👇 lien de retour vers l'accueil */}
+        <p className="text-sm text-center">
+          <a href="/" className="text-indigo-400 hover:underline">
+            ← Retour à l’accueil
+          </a>
+        </p>
       </form>
     </main>
   );

@@ -47,7 +47,7 @@ export default function DashboardPage() {
             href="/settings"
             className="w-full rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-5 text-center text-lg font-medium hover:bg-gray-800 active:bg-gray-700 transition"
           >
-            ⚙️ Paramètres
+            ➕ Ressources
           </a>
           <a
             href="/transactions"
@@ -61,6 +61,21 @@ export default function DashboardPage() {
           >
             📜 Historique des transactions
           </a>
+
+          {/* 👤 Profil (placeholder) */}
+          <button
+            type="button"
+            onClick={() =>
+              alert(
+                "👤 Profil utilisateur — en cours de développement.\nBientôt: photo, pseudo, préférences…"
+              )
+            }
+            className="w-full rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-5 text-center text-lg font-medium hover:bg-gray-800 active:bg-gray-700 transition"
+            aria-label="Profil utilisateur (en cours de développement)"
+          >
+            👤 Profil utilisateur
+            <span className="ml-2 text-sm text-gray-400">(en cours de dev)</span>
+          </button>
         </section>
 
         {/* Déconnexion */}
