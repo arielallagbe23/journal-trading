@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Pencil, Trash2, Folder, ChevronDown } from "lucide-react";
 
@@ -26,6 +26,9 @@ export default function TransactionsPage() {
   const [editEmotionAfter, setEditEmotionAfter] = useState("");
   const [editResult, setEditResult] = useState<"win" | "loss" | "">("");
   const [editProfit, setEditProfit] = useState<string>(""); // string pour l’input
+
+  const initEditRestore = useRef(false);
+  const initialCheckedFromTx = useRef<string[]>([]);
 
   // Select reset stylé, compatible iOS/Safari
   function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
@@ -58,6 +61,8 @@ export default function TransactionsPage() {
       dateIn: string;
       timeframe?: string;
       emotionBefore?: string;
+      planId?: string | null;
+      checkedStepIds?: string[];
     }[]
   >([]);
 
@@ -66,6 +71,25 @@ export default function TransactionsPage() {
   const [editAsset, setEditAsset] = useState("");
   const [editTimeframe, setEditTimeframe] = useState("");
   const [editEmotionBefore, setEditEmotionBefore] = useState("");
+
+  // 👇 AJOUT pour plan/étapes en mode édition
+  const [editSelectedPlan, setEditSelectedPlan] = useState(""); // plan choisi dans l’édition
+  const [editSteps, setEditSteps] = useState<Step[]>([]); // étapes du plan sélectionné (édition)
+  const [editCheckedSteps, setEditCheckedSteps] = useState<string[]>([]); // étapes cochées (édition)
+
+  function computePct(done: number, total: number) {
+    if (total <= 0) return 0;
+    return Math.round((done / total) * 100);
+  }
+
+  function strengthColor(pct: number) {
+    // style "mot de passe" : rouge → orange → jaune → vert
+    if (pct === 0) return "bg-rose-600";
+    if (pct < 35) return "bg-orange-500";
+    if (pct < 70) return "bg-yellow-400";
+    if (pct < 100) return "bg-lime-400";
+    return "bg-emerald-500";
+  }
 
   function startEdit(tx: any) {
     setEditingId(tx.id);
@@ -78,7 +102,21 @@ export default function TransactionsPage() {
     setEditEmotionAfter(tx.emotionAfter ?? "");
     setEditResult(tx.result ?? "");
     setEditProfit(typeof tx.profit === "number" ? String(tx.profit) : "");
+
+    // ✅ init plan + steps + checked depuis la tx
+    const checked = Array.isArray(tx.checkedStepIds) ? tx.checkedStepIds : [];
+    initialCheckedFromTx.current = checked;
+    initEditRestore.current = true; // marqueur: première restauration
+    setEditSelectedPlan(tx.planId ?? ""); // ⚠️ déclenche l'useEffect ci-dessous
+    setEditSteps([]);
+    setEditCheckedSteps(checked); // valeur provisoire (sera ré-intersectée après fetch)
   }
+
+  // helper d'intersection
+  const intersect = (a: string[], bIds: string[]) => {
+    const allowed = new Set(bIds);
+    return a.filter((id) => allowed.has(id));
+  };
 
   function cancelEdit() {
     setEditingId(null);
@@ -89,6 +127,55 @@ export default function TransactionsPage() {
     setEditEmotionAfter("");
     setEditResult("");
     setEditProfit("");
+
+    // 👇 reset plan/étapes (édition)
+    setEditSelectedPlan("");
+    setEditSteps([]);
+    setEditCheckedSteps([]);
+  }
+
+  useEffect(() => {
+    if (!editingId) return; // seulement en mode édition
+    if (!editSelectedPlan) {
+      setEditSteps([]);
+      setEditCheckedSteps([]);
+      return;
+    }
+    let aborted = false;
+
+    (async () => {
+      const r = await fetch(`/api/plans/${editSelectedPlan}/steps`, {
+        cache: "no-store",
+      });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (aborted) return;
+
+      const steps = j.steps ?? [];
+      setEditSteps(steps);
+
+      const stepIds = steps.map((s: Step) => s.id);
+
+      if (initEditRestore.current) {
+        // 1er chargement : on part de ce qui vient de la transaction
+        const restored = intersect(initialCheckedFromTx.current, stepIds);
+        setEditCheckedSteps(restored);
+        initEditRestore.current = false;
+      } else {
+        // changement de plan en cours d'édition : on garde ce qui existe dans le nouveau plan
+        setEditCheckedSteps((prev) => intersect(prev, stepIds));
+      }
+    })();
+
+    return () => {
+      aborted = true;
+    };
+  }, [editSelectedPlan, editingId]);
+
+  function toggleEditStep(id: string) {
+    setEditCheckedSteps((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    );
   }
 
   async function saveEdit() {
@@ -101,17 +188,22 @@ export default function TransactionsPage() {
         asset: editAsset,
         timeframe: editTimeframe,
         emotionBefore: editEmotionBefore,
-        confidence: editConfidence, // peut être true/false/null
-        emotionAfter: editEmotionAfter || null, // null si vide
-        result: editResult || null, // null si vide
+        confidence: editConfidence,
+        emotionAfter: editEmotionAfter || null,
+        result: editResult || null,
         profit: editProfit === "" ? null : Number(editProfit),
+
+        // ✅ important pour le calcul serveur
+        planId: editSelectedPlan || null,
+        checkedStepIds: editCheckedSteps,
+        // ❌ plus nécessaire si le serveur recalcule : respectSteps/totalSteps
       }),
     });
 
     const j = await res.json();
     if (!res.ok) return alert(j?.error ?? "Erreur de mise à jour");
 
-    // MAJ locale
+    // MAJ locale (si tu affiches ces infos quelque part)
     setOpenTx((prev) =>
       prev.map((t) =>
         t.id === editingId
@@ -124,6 +216,8 @@ export default function TransactionsPage() {
               emotionAfter: editEmotionAfter || null,
               result: (editResult as any) || null,
               profit: editProfit === "" ? null : Number(editProfit),
+              planId: editSelectedPlan || null,
+              checkedStepIds: editCheckedSteps,
             }
           : t
       )
@@ -133,11 +227,12 @@ export default function TransactionsPage() {
 
   async function closeEdit() {
     if (!editingId) return;
-
-    // petites validations côté UI
     if (!editResult) return alert("Choisis le résultat (win / loss)");
     if (editProfit === "")
       return alert("Renseigne le profit (positif ou négatif)");
+
+    const profitNum = Number(editProfit);
+    if (!Number.isFinite(profitNum)) return alert("Profit invalide");
 
     const body = {
       asset: editAsset,
@@ -145,10 +240,14 @@ export default function TransactionsPage() {
       emotionBefore: editEmotionBefore,
       confidence: editConfidence,
       emotionAfter: editEmotionAfter || "",
-      result: editResult, // "win" | "loss"
-      profit: Number(editProfit),
+      result: editResult,
+      profit: profitNum,
       status: "closed" as const,
-      dateOut: new Date().toISOString(), // on définit la sortie côté client
+      dateOut: new Date().toISOString(),
+
+      // ✅ indispensable
+      planId: editSelectedPlan || null,
+      checkedStepIds: editCheckedSteps,
     };
 
     const res = await fetch(`/api/transactions/${editingId}`, {
@@ -160,7 +259,6 @@ export default function TransactionsPage() {
     const j = await res.json();
     if (!res.ok) return alert(j?.error ?? "Erreur de clôture");
 
-    // retire de la liste “ouvertes”
     setOpenTx((prev) => prev.filter((t) => t.id !== editingId));
     cancelEdit();
   }
@@ -221,9 +319,6 @@ export default function TransactionsPage() {
     e.preventDefault();
     setMessage(null);
 
-    const respectSteps = checkedSteps.length;
-    const totalSteps = steps.length;
-
     try {
       const res = await fetch("/api/transactions", {
         method: "POST",
@@ -232,8 +327,14 @@ export default function TransactionsPage() {
           asset,
           timeframe,
           emotionBefore,
-          respectSteps,
-          totalSteps,
+
+          // ✅ nouveau contrat (serveur recalcule respectPlan)
+          planId: selectedPlan || null,
+          checkedStepIds: checkedSteps,
+
+          // ❌ optionnel/fallback : respectSteps/totalSteps plus nécessaires
+          // respectSteps: checkedSteps.length,
+          // totalSteps: steps.length,
         }),
       });
       const data = await res.json();
@@ -252,6 +353,28 @@ export default function TransactionsPage() {
       console.error(err);
       setMessage("❌ Erreur réseau");
     }
+  }
+
+  function JaugeRespect({ done, total }: { done: number; total: number }) {
+    const pct = computePct(done, total);
+    return (
+      <div className="mt-3">
+        <div className="flex justify-between text-xs text-gray-400 mb-1">
+          <span>Respect des étapes</span>
+          <span>
+            {done}/{total} ({pct}%)
+          </span>
+        </div>
+        <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
+          <div
+            className={`h-full ${strengthColor(
+              pct
+            )} transition-all duration-300`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -423,6 +546,64 @@ export default function TransactionsPage() {
                       <tr className="border-t border-gray-800 bg-gray-900/60">
                         <td colSpan={3} className="py-3 px-2">
                           <div className="grid md:grid-cols-3 gap-3">
+                            {/* --- Plan & Étapes (édition) --- */}
+                            <div className="md:col-span-3 rounded-lg border border-gray-800 p-3 bg-gray-900/70">
+                              {/* Sélecteur du plan */}
+                              <div className="mb-2">
+                                <label className="block text-xs text-gray-400">
+                                  Plan
+                                </label>
+                                <Select
+                                  value={editSelectedPlan}
+                                  onChange={(e) =>
+                                    setEditSelectedPlan(e.target.value)
+                                  }
+                                >
+                                  <option value="">
+                                    -- Choisir un plan --
+                                  </option>
+                                  {plans.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.title}
+                                    </option>
+                                  ))}
+                                </Select>
+                              </div>
+
+                              {/* Étapes du plan */}
+                              {editSteps.length > 0 && (
+                                <div className="space-y-2">
+                                  <label className="block text-xs text-gray-400">
+                                    Étapes du plan
+                                  </label>
+                                  <ul className="space-y-2">
+                                    {editSteps.map((s) => (
+                                      <li
+                                        key={s.id}
+                                        className="flex items-center gap-2"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={editCheckedSteps.includes(
+                                            s.id
+                                          )}
+                                          onChange={() => toggleEditStep(s.id)}
+                                          className="accent-indigo-500"
+                                        />
+                                        <span>{s.title}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+
+                                  {/* Jauge de respect */}
+                                  <JaugeRespect
+                                    done={editCheckedSteps.length}
+                                    total={editSteps.length}
+                                  />
+                                </div>
+                              )}
+                            </div>
+
                             {/* Asset */}
                             <div>
                               <label className="block text-xs text-gray-400">

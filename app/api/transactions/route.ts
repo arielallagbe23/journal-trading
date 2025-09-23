@@ -1,5 +1,4 @@
 export const runtime = "nodejs";
-// app/api/transactions/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { requireUserId } from "@/lib/requireUserId";
 import { addTransaction, getTransactionsByUser } from "@/lib/transactions";
@@ -28,9 +27,22 @@ export async function POST(req: NextRequest) {
   catch { return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 }); }
 
   const { asset, timeframe, emotionBefore } = body ?? {};
-  if (!asset || !timeframe || !emotionBefore) {
+  if (
+    typeof asset !== "string" || !asset.trim() ||
+    typeof timeframe !== "string" || !timeframe.trim() ||
+    typeof emotionBefore !== "string" || !emotionBefore.trim()
+  ) {
     return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
   }
+
+  // ✅ nouveaux champs (optionnels)
+  const planId =
+    body.planId === null ? null :
+    (typeof body.planId === "string" && body.planId.trim().length > 0 ? body.planId : null);
+
+  const checkedStepIds = Array.isArray(body.checkedStepIds)
+    ? body.checkedStepIds.filter((s: unknown) => typeof s === "string" && s.trim().length > 0)
+    : [];
 
   try {
     const tx = await addTransaction({
@@ -39,8 +51,14 @@ export async function POST(req: NextRequest) {
       timeframe,
       emotionBefore,
       confidence: body.confidence ?? null,
-      respectSteps: body.respectSteps ?? 0,
-      totalSteps: body.totalSteps ?? 0,
+
+      // 👇 passe au nouveau contrat: le lib recalcule respectPlan
+      planId,
+      checkedStepIds,
+
+      // (facultatif: garde le fallback legacy si l’ancien front existe encore)
+      respectSteps: typeof body.respectSteps === "number" ? body.respectSteps : undefined,
+      totalSteps: typeof body.totalSteps === "number" ? body.totalSteps : undefined,
     });
     return NextResponse.json({ ok: true, transaction: tx }, { status: 201 });
   } catch (e) {
