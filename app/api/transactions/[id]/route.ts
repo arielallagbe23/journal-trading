@@ -1,3 +1,4 @@
+// app/api/transactions/[id]/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -6,9 +7,10 @@ import { getTransactionById, updateTransaction, deleteTransaction } from "@/lib/
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } } // ✅ pas de Promise ici
+  { params }: { params: Promise<{ id: string }> } // ✅ votre projet attend un Promise ici
 ) {
-  const { id } = params;
+  const { id } = await params; // ✅ on "await" pour récupérer l'id
+
   let uid: string;
   try { uid = requireUserId(req); }
   catch { return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 }); }
@@ -21,7 +23,7 @@ export async function PATCH(
 
     const patchBody: any = await req.json();
 
-    // ✅ normalise les nouveaux champs (laisser passer brut mais sécurisé)
+    // Normalisation douce des champs
     const normalized: any = { ...patchBody };
 
     if ("planId" in patchBody) {
@@ -34,8 +36,6 @@ export async function PATCH(
         ? patchBody.checkedStepIds.filter((s: unknown) => typeof s === "string" && s.trim().length > 0)
         : [];
     }
-
-    // (optionnel) sécuriser profit en number/null
     if ("profit" in patchBody) {
       if (patchBody.profit === null || patchBody.profit === "") {
         normalized.profit = null;
@@ -56,9 +56,10 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } } // ✅ pas de Promise ici
+  { params }: { params: Promise<{ id: string }> } // ✅ idem
 ) {
-  const { id } = params;
+  const { id } = await params; // ✅
+
   let uid: string;
   try { uid = requireUserId(req); }
   catch { return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 }); }
