@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import LoadingSpinner from "./LoadingSpinner"; // ✅ importe ton spinner
 
 type Me =
   | { authenticated: false }
@@ -20,10 +21,11 @@ export default function DashboardPage() {
     })();
   }, [router]);
 
-  if (!me || !("authenticated" in me)) {
+  // ✅ Tant que `me` est null ou pas encore avec un nickname → affiche le spinner
+  if (!me || !("authenticated" in me) || (me.authenticated && !me.user.nickname)) {
     return (
       <main className="min-h-screen grid place-items-center bg-gray-950 text-gray-100">
-        <p>Chargement…</p>
+        <LoadingSpinner label="Chargement du profil..." />
       </main>
     );
   }
@@ -82,7 +84,7 @@ export default function DashboardPage() {
         <form
           action={async () => {
             await fetch("/api/logout", { method: "POST" });
-            router.replace("/login"); // tu gères la redirection ici
+            router.replace("/login");
           }}
         >
           <button className="w-full rounded-xl bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-600 text-white font-medium py-4 text-lg">

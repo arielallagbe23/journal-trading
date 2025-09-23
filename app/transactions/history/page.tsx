@@ -9,6 +9,7 @@ import {
   ChevronUp,
   ArrowUpRight,
   ArrowDownRight,
+  Trash2,
 } from "lucide-react";
 
 type Tx = {
@@ -80,7 +81,9 @@ export default function HistoryPage() {
     return (
       <span
         className={`px-2 py-1 rounded text-xs ${
-          isWin ? "bg-emerald-600/20 text-emerald-300" : "bg-rose-600/20 text-rose-300"
+          isWin
+            ? "bg-emerald-600/20 text-emerald-300"
+            : "bg-rose-600/20 text-rose-300"
         }`}
       >
         {isWin ? "Win" : "Loss"}
@@ -91,8 +94,10 @@ export default function HistoryPage() {
   function fmtProfit(t: Tx) {
     if (typeof t.profit !== "number") return "—";
     const val = Math.abs(t.profit).toFixed(2);
-    if (t.result === "win") return <span className="text-emerald-300">+{val}</span>;
-    if (t.result === "loss") return <span className="text-rose-300">-{val}</span>;
+    if (t.result === "win")
+      return <span className="text-emerald-300">+{val}</span>;
+    if (t.result === "loss")
+      return <span className="text-rose-300">-{val}</span>;
     return (
       <span className={t.profit >= 0 ? "text-emerald-300" : "text-rose-300"}>
         {t.profit.toFixed(2)}
@@ -102,6 +107,30 @@ export default function HistoryPage() {
 
   function toggleRow(id: string) {
     setOpenRows((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  async function handleDelete(id: string) {
+    // petite confirmation
+    const ok = confirm("Supprimer définitivement cette transaction ?");
+    if (!ok) return;
+
+    try {
+      const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        alert(j?.error ?? "Suppression impossible");
+        return;
+      }
+      // MAJ optimiste locale
+      setClosedTx((prev) => prev.filter((t) => t.id !== id));
+      // si on supprime la dernière de la page, on recule d’une page si possible
+      setPage((p) => {
+        const newTotal = Math.ceil((closedTx.length - 1) / perPage);
+        return Math.min(p, Math.max(1, newTotal));
+      });
+    } catch {
+      alert("Erreur réseau pendant la suppression");
+    }
   }
 
   return (
@@ -127,7 +156,9 @@ export default function HistoryPage() {
           ) : err ? (
             <p className="text-rose-400 text-sm">{err}</p>
           ) : closedTx.length === 0 ? (
-            <p className="text-gray-400 text-sm">Aucune transaction clôturée.</p>
+            <p className="text-gray-400 text-sm">
+              Aucune transaction clôturée.
+            </p>
           ) : (
             <div className="overflow-hidden">
               {/* Mobile-first: 3 colonnes -> Actif / Sortie / Résultat */}
@@ -159,7 +190,9 @@ export default function HistoryPage() {
                               ) : null}
                             </div>
                           </td>
-                          <td className="py-2 px-2 w-[50%] text-center">{fmtDate(t.dateOut)}</td>
+                          <td className="py-2 px-2 w-[50%] text-center">
+                            {fmtDate(t.dateOut)}
+                          </td>
                           <td className="py-2 px-2 w-[30%] text-center">
                             {resultPill(t.result)}
                             <span className="inline-block align-middle ml-1 text-gray-400">
@@ -174,44 +207,92 @@ export default function HistoryPage() {
 
                         {open && (
                           <tr className="bg-gray-900/60 border-t border-gray-800">
-                            <td colSpan={3} className="px-2 pb-3 pt-2">
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="rounded-lg border border-gray-800 p-2">
-                                  <div className="text-[11px] text-gray-400">Timeframe</div>
-                                  <div className="text-sm">{t.timeframe || "—"}</div>
-                                </div>
-                                <div className="rounded-lg border border-gray-800 p-2">
-                                  <div className="text-[11px] text-gray-400">Entrée</div>
-                                  <div className="text-sm">{fmtDate(t.dateIn)}</div>
-                                </div>
-                                <div className="rounded-lg border border-gray-800 p-2">
-                                  <div className="text-[11px] text-gray-400">Profit</div>
-                                  <div className="text-sm">{fmtProfit(t)}</div>
-                                </div>
-                                <div className="rounded-lg border border-gray-800 p-2">
-                                  <div className="text-[11px] text-gray-400">Respect du plan</div>
-                                  <div className="text-sm">
-                                    {typeof t.respectPlan === "number" ? `${t.respectPlan}%` : "—"}
+                            <td colSpan={3} className=" pb-2 pt-2">
+                              <div className="flex flex-col space-y-2 rounded-lg">
+                                {/* Ligne 1 : Timeframe / Entrée / Profit */}
+                                <div className="flex w-full space-x-2">
+                                  <div className="w-1/4 rounded-lg border border-gray-800 p-2 text-center">
+                                    <div className="text-[11px] text-gray-400">
+                                      Timeframe
+                                    </div>
+                                    <div className="text-sm">
+                                      {t.timeframe || "—"}
+                                    </div>
+                                  </div>
+                                  <div className="w-2/4 rounded-lg border border-gray-800 p-2 text-center">
+                                    <div className="text-[11px] text-gray-400">
+                                      Entrée
+                                    </div>
+                                    <div className="text-sm">
+                                      {fmtDate(t.dateIn)}
+                                    </div>
+                                  </div>
+                                  <div className="w-1/4 rounded-lg border border-gray-800 p-2 text-center">
+                                    <div className="text-[11px] text-gray-400">
+                                      Profit
+                                    </div>
+                                    <div className="text-sm">
+                                      {fmtProfit(t)}
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="rounded-lg border border-gray-800 p-2">
-                                  <div className="text-[11px] text-gray-400">Confiance</div>
-                                  <div className="text-sm">
-                                    {t.confidence === true
-                                      ? "Oui"
-                                      : t.confidence === false
-                                      ? "Non"
-                                      : "—"}
+
+                                {/* Ligne 2 : Émotions */}
+                                <div className="flex w-full space-x-2">
+                                  <div className="flex-1 rounded-lg border border-gray-800 p-2">
+                                    <div className="text-[11px] text-gray-400">
+                                      Émotion avant
+                                    </div>
+                                    <div className="text-sm">
+                                      {t.emotionBefore || "—"}
+                                    </div>
+                                  </div>
+                                  <div className="flex-1 rounded-lg border border-gray-800 p-2">
+                                    <div className="text-[11px] text-gray-400">
+                                      Émotion après
+                                    </div>
+                                    <div className="text-sm">
+                                      {t.emotionAfter || "—"}
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="rounded-lg border border-gray-800 p-2">
-                                  <div className="text-[11px] text-gray-400">Émotion avant</div>
-                                  <div className="text-sm">{t.emotionBefore || "—"}</div>
-                                </div>
-                                <div className="rounded-lg border border-gray-800 p-2 col-span-2">
-                                  <div className="text-[11px] text-gray-400">Émotion après</div>
-                                  <div className="text-sm">{t.emotionAfter || "—"}</div>
-                                </div>
+
+
+
+                                {/* Ligne 3 : Respect du plan / Confiance / Supprimer */}
+<div className="flex w-full gap-2 items-stretch">
+  {/* Respect du plan */}
+  <div className="w-1/3 rounded-lg border border-gray-800 p-2 flex flex-col justify-between min-h-[64px]">
+    <div className="text-[11px] text-gray-400">Respect du plan</div>
+    <div className="text-sm">
+      {typeof t.respectPlan === "number" ? `${t.respectPlan}%` : "—"}
+    </div>
+  </div>
+
+  {/* Confiance */}
+  <div className="w-1/3 rounded-lg border border-gray-800 p-2 flex flex-col justify-between min-h-[64px]">
+    <div className="text-[11px] text-gray-400">Confiance</div>
+    <div className="text-sm">
+      {t.confidence === true ? "Oui" : t.confidence === false ? "Non" : "—"}
+    </div>
+  </div>
+
+  {/* Bouton (1/3, même hauteur) */}
+  <div className="w-1/3">
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        handleDelete(t.id);
+      }}
+      className="w-full h-full rounded-lg border border-gray-800 bg-rose-600/80 hover:bg-rose-500 text-white flex items-center justify-center shadow"
+      aria-label="Supprimer"
+    >
+      <Trash2 className="w-5 h-5" />
+    </button>
+  </div>
+</div>
+
+
                               </div>
                             </td>
                           </tr>
