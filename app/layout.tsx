@@ -13,6 +13,9 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   manifest: "/manifest.webmanifest", // this is the route created by app/manifest.ts
+};
+
+export const viewport = {
   themeColor: "#0b1020",
 };
 

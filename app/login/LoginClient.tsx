@@ -1,11 +1,11 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, FormEvent, ChangeEvent } from "react";
 
 export default function LoginClient() {
   const router = useRouter();
-  const search = useSearchParams(); // ✅ OK dans un client component
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -93,16 +93,22 @@ export default function LoginClient() {
 
         <p className="text-sm text-center text-gray-400">
           Pas encore de compte ?{" "}
-          <a href="/signup" className="text-indigo-400 hover:underline">
+          <Link href="/signup" className="text-indigo-400 hover:underline">
             Inscrivez-vous
-          </a>
+          </Link>
+        </p>
+
+        <p className="text-sm text-center">
+          <Link href="/forgot-password" className="text-indigo-400 hover:underline">
+            Mot de passe oublié ?
+          </Link>
         </p>
 
         {/* 👇 lien de retour vers l'accueil */}
         <p className="text-sm text-center">
-          <a href="/" className="text-indigo-400 hover:underline">
+          <Link href="/" className="text-indigo-400 hover:underline">
             ← Retour à l’accueil
-          </a>
+          </Link>
         </p>
       </form>
     </main>

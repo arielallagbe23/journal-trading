@@ -1,8 +1,20 @@
 "use client";
 
-import { Fragment, useEffect, useState, useRef } from "react";
+import { Fragment, useEffect, useState, useRef, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2, Folder, ChevronDown } from "lucide-react";
+import NextImage from "next/image";
+import {
+  ArrowLeft,
+  Pencil,
+  Trash2,
+  Folder,
+  ChevronDown,
+  Image as ImageIcon,
+  Loader2,
+  CheckCircle2,
+} from "lucide-react";
+import { parseMt5HistoryText, ParsedOcrTrade } from "@/lib/mt5Ocr";
+import type Tesseract from "tesseract.js";
 
 type Plan = { id: string; title: string };
 type Step = { id: string; title: string };
@@ -89,6 +101,22 @@ export default function TransactionsPage() {
     if (pct < 70) return "bg-yellow-400";
     if (pct < 100) return "bg-lime-400";
     return "bg-emerald-500";
+  }
+
+  function handleUseParsedRow(row: ParsedOcrTrade) {
+    setAsset(row.symbol);
+    setEmotionBefore((prev) =>
+      prev
+        ? prev
+        : row.side === "buy"
+        ? "confiant"
+        : "indecis"
+    );
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      /* no-op */
+    }
   }
 
   function startEdit(tx: any) {
@@ -391,6 +419,8 @@ export default function TransactionsPage() {
           </button>
           <h1 className="text-2xl font-bold">➕ Nouvelle Transaction</h1>
         </div>
+
+        <ImageImportPanel onUseRow={handleUseParsedRow} />
 
         {/* Form */}
         <section className="rounded-2xl border border-gray-800 p-4 bg-gray-900/50">
@@ -781,5 +811,226 @@ export default function TransactionsPage() {
         )}
       </div>
     </main>
+  );
+}
+
+type ImageImportPanelProps = {
+  onUseRow?: (row: ParsedOcrTrade) => void;
+};
+
+function ImageImportPanel({ onUseRow }: ImageImportPanelProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [phase, setPhase] = useState<"idle" | "processing" | "done" | "error">(
+    "idle"
+  );
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [rows, setRows] = useState<ParsedOcrTrade[]>([]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  async function handleFile(file: File) {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    setPhase("processing");
+    setProgress(0);
+    setError(null);
+    setRows([]);
+
+    try {
+      type TesseractImport = Tesseract & { default?: Tesseract };
+      const tesseract = (await import("tesseract.js")) as TesseractImport;
+      const recognizeFn: Tesseract["recognize"] | undefined =
+        tesseract.recognize ?? tesseract.default?.recognize;
+      if (!recognizeFn) throw new Error("OCR indisponible");
+
+      const result = await recognizeFn(file, "eng", {
+        logger: (msg: Tesseract.LoggerMessage) => {
+          if (typeof msg?.progress === "number") {
+            setProgress(Math.round(msg.progress * 100));
+          }
+        },
+      });
+
+      const text = result?.data?.text ?? "";
+      const parsed = parseMt5HistoryText(text);
+      setRows(parsed);
+      setPhase("done");
+      if (parsed.length === 0) {
+        setError(
+          "Aucune ligne sûre détectée. Utilise une capture plus nette ou recadre l’historique."
+        );
+      }
+    } catch (err) {
+      console.error("OCR error:", err);
+      setError(
+        "Impossible de lire l’image. Vérifie la connexion et la netteté de la capture."
+      );
+      setPhase("error");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function onInputChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+  }
+
+  return (
+    <section className="rounded-2xl border border-gray-800 bg-gray-900/60 p-4 flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <div className="w-11 h-11 rounded-xl bg-indigo-500/20 text-indigo-300 grid place-items-center">
+          <ImageIcon className="w-6 h-6" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold">Import via capture</h2>
+          <p className="text-xs text-gray-400">
+            Dépose ta capture MT5, on OCRise et on alimente un tableau prêt à
+            valider.
+          </p>
+        </div>
+      </div>
+
+      <label className="cursor-pointer border-2 border-dashed border-gray-700 hover:border-indigo-400 transition rounded-2xl p-6 text-center">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={onInputChange}
+        />
+        <div className="flex flex-col items-center gap-2 text-sm text-gray-400">
+          <span className="text-indigo-300 font-medium">
+            {phase === "processing" ? "Lecture en cours…" : "Déposer / Choisir"}
+          </span>
+          <p className="text-xs">
+            JPG, PNG ou capture iOS. Idéalement zoomée sur l’onglet
+            “Transactions”.
+          </p>
+        </div>
+      </label>
+
+      {previewUrl && (
+        <div className="relative rounded-xl overflow-hidden border border-gray-800 h-80">
+          <NextImage
+            src={previewUrl}
+            alt="Capture importée"
+            fill
+            sizes="(max-width: 768px) 100vw, 400px"
+            className="object-cover"
+            unoptimized
+            priority={false}
+          />
+        </div>
+      )}
+
+      {phase === "processing" && (
+        <div className="flex items-center gap-3 text-sm text-gray-200">
+          <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+          OCR {progress}%
+        </div>
+      )}
+
+      {phase === "done" && !error && rows.length > 0 && (
+        <div className="rounded-xl border border-gray-800 overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 text-xs text-emerald-300 border-b border-gray-800 bg-gray-900/70">
+            <CheckCircle2 className="w-4 h-4" />
+            {rows.length} transaction(s) détectée(s)
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs sm:text-sm">
+              <thead>
+                <tr className="text-gray-400 text-left">
+                  <th className="px-3 py-2">Actif</th>
+                  <th className="px-3 py-2">Volume</th>
+                  <th className="px-3 py-2">Entrée → Sortie</th>
+                  <th className="px-3 py-2">Sortie</th>
+                  <th className="px-3 py-2">P&L</th>
+                  {onUseRow && <th className="px-3 py-2 text-right">Action</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-t border-gray-800 text-gray-100"
+                  >
+                    <td className="px-3 py-2">
+                      <div className="font-semibold">{row.symbol}</div>
+                      <p className="text-xs text-gray-400">
+                        {row.side.toUpperCase()}
+                      </p>
+                    </td>
+                    <td className="px-3 py-2">
+                      {row.volume !== null ? row.volume : "—"}
+                    </td>
+                    <td className="px-3 py-2">
+                      {row.entryPrice !== null && row.exitPrice !== null ? (
+                        <span>
+                          {row.entryPrice} → {row.exitPrice}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {row.closedAt
+                        ? new Date(row.closedAt).toLocaleString("fr-FR", {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          })
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-2 font-semibold">
+                      {row.profit === null ? (
+                        "—"
+                      ) : (
+                        <span
+                          className={
+                            row.profit >= 0
+                              ? "text-emerald-300"
+                              : "text-rose-300"
+                          }
+                        >
+                          {row.profit >= 0 ? "+" : ""}
+                          {row.profit.toFixed(2)}
+                        </span>
+                      )}
+                    </td>
+                    {onUseRow && (
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onUseRow(row)}
+                          className="px-3 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-xs"
+                        >
+                          Pré-remplir
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="px-3 py-2 text-xs text-gray-400 border-t border-gray-800">
+            Vérifie chaque ligne avant de créer officiellement la transaction.
+          </p>
+        </div>
+      )}
+
+      {error && (
+        <p className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/40 rounded-lg px-3 py-2">
+          {error}
+        </p>
+      )}
+    </section>
   );
 }

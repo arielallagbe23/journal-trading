@@ -4,17 +4,22 @@ import { randomUUID as nodeRandomUUID } from "crypto";
 
 export type User = { id: string; email: string; passwordHash: string; nickname: string };
 
-const globalAny = globalThis as any;
+type GlobalUsersCache = typeof globalThis & {
+  __USERS_BY_EMAIL__?: Map<string, User>;
+  __USERS_BY_ID__?: Map<string, User>;
+  __USERS_HYDR__?: { started: boolean };
+};
+const globalUsers = globalThis as GlobalUsersCache;
 
 // caches mémoire (par process)
-const _usersByEmail: Map<string, User> = globalAny.__USERS_BY_EMAIL__ ?? new Map();
-const _usersById: Map<string, User> = globalAny.__USERS_BY_ID__ ?? new Map();
-if (!globalAny.__USERS_BY_EMAIL__) globalAny.__USERS_BY_EMAIL__ = _usersByEmail;
-if (!globalAny.__USERS_BY_ID__) globalAny.__USERS_BY_ID__ = _usersById;
+const _usersByEmail: Map<string, User> = globalUsers.__USERS_BY_EMAIL__ ?? new Map();
+const _usersById: Map<string, User> = globalUsers.__USERS_BY_ID__ ?? new Map();
+if (!globalUsers.__USERS_BY_EMAIL__) globalUsers.__USERS_BY_EMAIL__ = _usersByEmail;
+if (!globalUsers.__USERS_BY_ID__) globalUsers.__USERS_BY_ID__ = _usersById;
 
 // état d’hydratation
-const _hydr = globalAny.__USERS_HYDR__ ?? { started: false };
-if (!globalAny.__USERS_HYDR__) globalAny.__USERS_HYDR__ = _hydr;
+const _hydr = globalUsers.__USERS_HYDR__ ?? { started: false };
+if (!globalUsers.__USERS_HYDR__) globalUsers.__USERS_HYDR__ = _hydr;
 
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -69,6 +74,21 @@ export function findUserByEmail(email: string) {
   return undefined; // uniforme
 }
 
+export async function findUserByEmailOrFetch(email: string) {
+  const cached = findUserByEmail(email);
+  if (cached) return cached;
+  const normalized = normalizeEmail(email);
+  try {
+    const snap = await adminDb.collection("users").where("email", "==", normalized).limit(1).get();
+    if (snap.empty) return null;
+    const user = snap.docs[0].data() as User;
+    return putInCaches(user);
+  } catch (err) {
+    console.error("findUserByEmailOrFetch failed:", err);
+    throw err;
+  }
+}
+
 export function findUserById(id: string) {
   const u = _usersById.get(id);
   if (u) return u;
@@ -91,12 +111,13 @@ export function findUserById(id: string) {
 function genId() {
   // web crypto si dispo, sinon fallback Node
   try {
-    // @ts-ignore
-    if (typeof crypto !== "undefined" && crypto?.randomUUID) {
-      // @ts-ignore
-      return crypto.randomUUID();
+    const maybeCrypto = (globalThis as { crypto?: Crypto }).crypto;
+    if (maybeCrypto?.randomUUID) {
+      return maybeCrypto.randomUUID();
     }
-  } catch {}
+  } catch {
+    // ignore si indisponible
+  }
   return nodeRandomUUID();
 }
 
@@ -137,4 +158,27 @@ export function saveUser(user: { email: string; passwordHash: string; nickname: 
   })();
 
   return u;
+}
+
+export async function updateUserPasswordHash(userId: string, passwordHash: string) {
+  let user = _usersById.get(userId);
+  if (!user) {
+    try {
+      const doc = await adminDb.collection("users").doc(userId).get();
+      if (!doc.exists) return null;
+      user = putInCaches(doc.data() as User);
+    } catch (err) {
+      console.error("updateUserPasswordHash lookup failed:", err);
+      return null;
+    }
+  }
+
+  const updated: User = { ...user, passwordHash };
+  putInCaches(updated);
+  try {
+    await adminDb.collection("users").doc(userId).update({ passwordHash });
+  } catch (err) {
+    console.error("updateUserPasswordHash persist failed:", err);
+  }
+  return updated;
 }
