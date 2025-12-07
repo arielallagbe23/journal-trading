@@ -14,7 +14,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { parseMt5HistoryText, ParsedOcrTrade } from "@/lib/mt5Ocr";
-import type Tesseract from "tesseract.js";
+import * as Tesseract from "tesseract.js";
 
 type Plan = { id: string; title: string };
 type Step = { id: string; title: string };
@@ -844,9 +844,8 @@ function ImageImportPanel({ onUseRow }: ImageImportPanelProps) {
     setRows([]);
 
     try {
-      type TesseractImport = Tesseract & { default?: Tesseract };
-      const tesseract = (await import("tesseract.js")) as TesseractImport;
-      const recognizeFn: Tesseract["recognize"] | undefined =
+      const tesseract = await import("tesseract.js");
+      const recognizeFn: typeof Tesseract.recognize | undefined =
         tesseract.recognize ?? tesseract.default?.recognize;
       if (!recognizeFn) throw new Error("OCR indisponible");
 
