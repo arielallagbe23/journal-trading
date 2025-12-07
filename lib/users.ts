@@ -138,3 +138,23 @@ export function saveUser(user: { email: string; passwordHash: string; nickname: 
 
   return u;
 }
+
+export async function findUserByEmailOrFetch(email: string) {
+  const cached = findUserByEmail(email);
+  if (cached) return cached;
+
+  const normalized = normalizeEmail(email);
+  const snap = await adminDb.collection("users").where("email", "==", normalized).limit(1).get();
+  if (snap.empty) return undefined;
+  return putInCaches(snap.docs[0].data() as User);
+}
+
+export async function updateUserPasswordHash(userId: string, passwordHash: string) {
+  const docRef = adminDb.collection("users").doc(userId);
+  const doc = await docRef.get();
+  if (!doc.exists) return undefined;
+
+  await docRef.update({ passwordHash });
+  const updated = putInCaches({ ...(doc.data() as User), passwordHash });
+  return updated;
+}

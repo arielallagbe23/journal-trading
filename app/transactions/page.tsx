@@ -18,8 +18,10 @@ import { parseMt5HistoryText, ParsedOcrTrade } from "@/lib/mt5Ocr";
 type Plan = { id: string; title: string };
 type Step = { id: string; title: string };
 type Asset = { id: string; assetName: string };
-type TesseractModule = typeof import("tesseract.js");
-type TesseractImport = TesseractModule & { default?: TesseractModule };
+type TesseractModule = Awaited<typeof import("tesseract.js")>;
+type TesseractImport = Partial<TesseractModule> & {
+  default?: Partial<TesseractModule>;
+};
 type TesseractLoggerMessage = { progress?: number };
 
 export default function TransactionsPage() {
