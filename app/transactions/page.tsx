@@ -14,11 +14,13 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { parseMt5HistoryText, ParsedOcrTrade } from "@/lib/mt5Ocr";
-import type Tesseract from "tesseract.js";
 
 type Plan = { id: string; title: string };
 type Step = { id: string; title: string };
 type Asset = { id: string; assetName: string };
+type TesseractModule = typeof import("tesseract.js");
+type TesseractImport = TesseractModule & { default?: TesseractModule };
+type TesseractLoggerMessage = { progress?: number };
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -106,11 +108,7 @@ export default function TransactionsPage() {
   function handleUseParsedRow(row: ParsedOcrTrade) {
     setAsset(row.symbol);
     setEmotionBefore((prev) =>
-      prev
-        ? prev
-        : row.side === "buy"
-        ? "confiant"
-        : "indecis"
+      prev ? prev : row.side === "buy" ? "confiant" : "indecis"
     );
     try {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -818,6 +816,30 @@ type ImageImportPanelProps = {
   onUseRow?: (row: ParsedOcrTrade) => void;
 };
 
+async function recognizeImageText(
+  file: File,
+  onProgress: (pct: number) => void
+) {
+  const imported = (await import("tesseract.js")) as TesseractImport;
+  const candidate: Partial<TesseractModule> | null =
+    typeof imported.recognize === "function"
+      ? imported
+      : imported.default ?? null;
+  const recognize: TesseractModule["recognize"] | undefined =
+    candidate?.recognize;
+  if (!recognize) throw new Error("OCR indisponible");
+
+  const result = await recognize(file, "eng", {
+    logger: (msg: TesseractLoggerMessage) => {
+      if (typeof msg?.progress === "number") {
+        onProgress(Math.round(msg.progress * 100));
+      }
+    },
+  });
+
+  return result?.data?.text ?? "";
+}
+
 function ImageImportPanel({ onUseRow }: ImageImportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -844,21 +866,7 @@ function ImageImportPanel({ onUseRow }: ImageImportPanelProps) {
     setRows([]);
 
     try {
-      type TesseractImport = Tesseract & { default?: Tesseract };
-      const tesseract = (await import("tesseract.js")) as TesseractImport;
-      const recognizeFn: Tesseract["recognize"] | undefined =
-        tesseract.recognize ?? tesseract.default?.recognize;
-      if (!recognizeFn) throw new Error("OCR indisponible");
-
-      const result = await recognizeFn(file, "eng", {
-        logger: (msg: Tesseract.LoggerMessage) => {
-          if (typeof msg?.progress === "number") {
-            setProgress(Math.round(msg.progress * 100));
-          }
-        },
-      });
-
-      const text = result?.data?.text ?? "";
+      const text = await recognizeImageText(file, setProgress);
       const parsed = parseMt5HistoryText(text);
       setRows(parsed);
       setPhase("done");
