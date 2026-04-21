@@ -47,6 +47,36 @@ function getWeekDays(): Date[] {
   });
 }
 
+// Mots-clés qui rendent un jour "Critique" même si impact = Medium
+const CRITICAL_KEYWORDS = [
+  "non-farm", "nfp", "payroll",
+  "fomc", "federal reserve", "fed chair", "powell",
+  "boj", "bank of japan", "ueda", "rate decision", "interest rate",
+  "cpi", "inflation",
+  "gdp", "gross domestic",
+  "pce",
+];
+
+type Vigilance = "critique" | "haute" | "calme";
+
+function getVigilance(events: CalendarEvent[]): Vigilance {
+  if (!events.length) return "calme";
+  const hasHigh = events.some((e) => e.impact === "High");
+  const hasCriticalKeyword = events.some((e) =>
+    CRITICAL_KEYWORDS.some((kw) => e.title.toLowerCase().includes(kw))
+  );
+  if (hasHigh || hasCriticalKeyword) return "critique";
+  if (events.some((e) => e.impact === "Medium")) return "haute";
+  return "calme";
+}
+
+function VigilanceBadge({ v, size = "sm" }: { v: Vigilance; size?: "sm" | "lg" }) {
+  const base = size === "lg" ? "px-3 py-1 rounded-full text-sm font-bold" : "px-2 py-0.5 rounded-full text-xs font-semibold";
+  if (v === "critique") return <span className={`${base} bg-rose-900/70 text-rose-300`}>🔴 Critique</span>;
+  if (v === "haute")    return <span className={`${base} bg-amber-900/60 text-amber-300`}>⚠️ Vigilance haute</span>;
+  return                       <span className={`${base} bg-emerald-900/50 text-emerald-400`}>✅ Calme</span>;
+}
+
 function BiasBadge({ b }: { b: "up" | "down" | "neutral" }) {
   if (b === "up")
     return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-900/60 text-emerald-300">↑ Haussier</span>;
@@ -200,6 +230,48 @@ export default function NewsPage() {
           </div>
         )}
 
+        {/* Vigilance semaine */}
+        {!calLoading && !calError && (
+          <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 flex flex-col gap-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Vigilance de la semaine</p>
+            <div className="flex flex-col gap-2">
+              {weekDays.map((day) => {
+                const key = toParisDKey(day);
+                const events = grouped[key] ?? [];
+                const v = getVigilance(events);
+                const isToday = key === todayKey;
+                const isPast = day < todayMidnight;
+                const highEvents = events.filter((e) => e.impact === "High" || CRITICAL_KEYWORDS.some((kw) => e.title.toLowerCase().includes(kw)));
+                const label = DAY_LABELS[day.getDay()] + " " + day.getDate();
+
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2"
+                    style={{
+                      background: isToday ? "rgba(99,102,241,0.08)" : "transparent",
+                      opacity: isPast && !isToday ? 0.45 : 1,
+                    }}
+                  >
+                    <span className={`text-sm w-14 shrink-0 ${isToday ? "text-indigo-400 font-bold" : "text-gray-400"}`}>
+                      {label}
+                    </span>
+                    <VigilanceBadge v={v} />
+                    {highEvents.length > 0 && (
+                      <span className="text-xs text-gray-500 truncate flex-1">
+                        {highEvents.map((e) => e.title).join(" · ")}
+                      </span>
+                    )}
+                    {events.length === 0 && (
+                      <span className="text-xs text-gray-600">Aucun événement USD/JPY</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Today recap card */}
         {!calLoading && !calError && (
           <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 flex flex-col gap-4">
@@ -208,6 +280,7 @@ export default function NewsPage() {
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-base">Aujourd'hui · USD/JPY</span>
+                <VigilanceBadge v={getVigilance(todayEvents)} />
                 {bias && !biasLoading && <BiasBadge b={bias.bias} />}
                 {biasLoading && <span className="text-xs text-gray-500 animate-pulse">Analyse en cours…</span>}
               </div>
