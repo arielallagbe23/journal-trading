@@ -6,14 +6,14 @@ export type User = { id: string; email: string; passwordHash: string; nickname: 
 
 const globalAny = globalThis as typeof globalThis & Record<string, unknown>;
 
-// caches mémoire (par process)
-const _usersByEmail: Map<string, User> = globalAny.__USERS_BY_EMAIL__ ?? new Map();
-const _usersById: Map<string, User> = globalAny.__USERS_BY_ID__ ?? new Map();
+type UserMap = Map<string, User>;
+const _usersByEmail: UserMap = (globalAny.__USERS_BY_EMAIL__ as UserMap | undefined) ?? new Map();
+const _usersById: UserMap = (globalAny.__USERS_BY_ID__ as UserMap | undefined) ?? new Map();
 if (!globalAny.__USERS_BY_EMAIL__) globalAny.__USERS_BY_EMAIL__ = _usersByEmail;
 if (!globalAny.__USERS_BY_ID__) globalAny.__USERS_BY_ID__ = _usersById;
 
 // état d’hydratation
-const _hydr = globalAny.__USERS_HYDR__ ?? { started: false };
+const _hydr = (globalAny.__USERS_HYDR__ as { started: boolean } | undefined) ?? { started: false };
 if (!globalAny.__USERS_HYDR__) globalAny.__USERS_HYDR__ = _hydr;
 
 export function normalizeEmail(email: string) {
@@ -91,9 +91,7 @@ export function findUserById(id: string) {
 function genId() {
   // web crypto si dispo, sinon fallback Node
   try {
-    // @ts-expect-error - crypto.randomUUID disponible en Node 19+ et navigateurs modernes
     if (typeof crypto !== "undefined" && crypto?.randomUUID) {
-      // @ts-expect-error - randomUUID non typé dans certaines cibles TS
       return crypto.randomUUID();
     }
   } catch {}

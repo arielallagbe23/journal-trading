@@ -9,13 +9,13 @@ const SECRET = process.env.SESSION_SECRET;
 
 const g = globalThis as typeof globalThis & Record<string, unknown>;
 
-// dev: token -> { userId, expiresAt }
-const _sessions: Map<string, { userId: string; expiresAt: number }> =
-  g.__SESSIONS__ ?? new Map();
+type SessionEntry = { userId: string; expiresAt: number };
+const _sessions: Map<string, SessionEntry> =
+  (g.__SESSIONS__ as Map<string, SessionEntry> | undefined) ?? new Map();
 if (!g.__SESSIONS__) g.__SESSIONS__ = _sessions;
 
-// blacklist jti pour la révocation au logout (prod + dev)
-const _blacklist: Set<string> = g.__SESSION_BLACKLIST__ ?? new Set();
+const _blacklist: Set<string> =
+  (g.__SESSION_BLACKLIST__ as Set<string> | undefined) ?? new Set();
 if (!g.__SESSION_BLACKLIST__) g.__SESSION_BLACKLIST__ = _blacklist;
 
 // --- utils base64url ---
@@ -63,9 +63,9 @@ function verifySignedToken(token?: string | null): string | null {
   if (typeof payload.sub !== "string") return null;
   if (typeof payload.exp !== "number") return null;
   if (Math.floor(Date.now() / 1000) > payload.exp) return null;
-  if (payload.jti && _blacklist.has(payload.jti)) return null; // révoqué
+  if (typeof payload.jti === "string" && _blacklist.has(payload.jti)) return null; // révoqué
 
-  return payload.sub as string;
+  return typeof payload.sub === "string" ? payload.sub : null;
 }
 
 const DEV_TTL_SEC = 60 * 60 * 24 * 7; // 7 jours (identique aux tokens signés)
@@ -94,7 +94,7 @@ export function destroySession(token?: string | null) {
     const parts = token.split(".");
     if (parts.length === 3) {
       const payload = extractPayload(parts[1]);
-      if (payload?.jti) _blacklist.add(payload.jti);
+      if (typeof payload?.jti === "string") _blacklist.add(payload.jti);
     }
     return;
   }
