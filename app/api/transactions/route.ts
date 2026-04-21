@@ -9,8 +9,11 @@ export async function GET(req: NextRequest) {
   catch { return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 }); }
 
   try {
-    const transactions = await getTransactionsByUser(uid);
-    return NextResponse.json({ transactions });
+    const url = new URL(req.url);
+    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "20"), 100);
+    const cursor = url.searchParams.get("cursor") ?? undefined;
+    const { transactions, nextCursor } = await getTransactionsByUser(uid, { limit, cursor });
+    return NextResponse.json({ transactions, nextCursor });
   } catch (e) {
     console.error("GET /api/transactions failed:", e);
     return NextResponse.json({ error: "SERVER_ERROR" }, { status: 500 });

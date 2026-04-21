@@ -1,8 +1,9 @@
 "use client";
 
-import { Fragment, useEffect, useState, useRef, ChangeEvent } from "react";
+import { Fragment, useEffect, useState, useRef, ChangeEvent, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
+import Toast from "@/app/components/Toast";
 import {
   ArrowLeft,
   Pencil,
@@ -42,6 +43,11 @@ export default function TransactionsPage() {
   const [editEmotionAfter, setEditEmotionAfter] = useState("");
   const [editResult, setEditResult] = useState<"win" | "loss" | "">("");
   const [editProfit, setEditProfit] = useState<string>(""); // string pour l’input
+
+  const [toast, setToast] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [txDisplayPage, setTxDisplayPage] = useState(0);
+  const TX_PER_PAGE = 10;
 
   const initEditRestore = useRef(false);
   const initialCheckedFromTx = useRef<string[]>([]);
@@ -110,7 +116,7 @@ export default function TransactionsPage() {
   function handleUseParsedRow(row: ParsedOcrTrade) {
     setAsset(row.symbol);
     setEmotionBefore((prev) =>
-      prev ? prev : row.side === "buy" ? "confiant" : "indecis"
+      prev ? prev : row.side === "buy" ? "confiant" : "indécis"
     );
     try {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -207,8 +213,9 @@ export default function TransactionsPage() {
   }
 
   async function saveEdit() {
-    if (!editingId) return;
-
+    if (!editingId || isSaving) return;
+    setIsSaving(true);
+    try {
     const res = await fetch(`/api/transactions/${editingId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -220,16 +227,13 @@ export default function TransactionsPage() {
         emotionAfter: editEmotionAfter || null,
         result: editResult || null,
         profit: editProfit === "" ? null : Number(editProfit),
-
-        // ✅ important pour le calcul serveur
         planId: editSelectedPlan || null,
         checkedStepIds: editCheckedSteps,
-        // ❌ plus nécessaire si le serveur recalcule : respectSteps/totalSteps
       }),
     });
 
     const j = await res.json();
-    if (!res.ok) return alert(j?.error ?? "Erreur de mise à jour");
+    if (!res.ok) { setToast(j?.error ?? "Erreur de mise à jour"); return; }
 
     // MAJ locale (si tu affiches ces infos quelque part)
     setOpenTx((prev) =>
@@ -251,16 +255,18 @@ export default function TransactionsPage() {
       )
     );
     cancelEdit();
+    } finally { setIsSaving(false); }
   }
 
   async function closeEdit() {
-    if (!editingId) return;
-    if (!editResult) return alert("Choisis le résultat (win / loss)");
-    if (editProfit === "")
-      return alert("Renseigne le profit (positif ou négatif)");
+    if (!editingId || isSaving) return;
+    if (!editResult) { setToast("Choisis le résultat (win / loss)"); return; }
+    if (editProfit === "") { setToast("Renseigne le profit (positif ou négatif)"); return; }
 
     const profitNum = Number(editProfit);
-    if (!Number.isFinite(profitNum)) return alert("Profit invalide");
+    if (!Number.isFinite(profitNum)) { setToast("Profit invalide"); return; }
+    setIsSaving(true);
+    try {
 
     const body = {
       asset: editAsset,
@@ -285,10 +291,11 @@ export default function TransactionsPage() {
     });
 
     const j = await res.json();
-    if (!res.ok) return alert(j?.error ?? "Erreur de clôture");
+    if (!res.ok) { setToast(j?.error ?? "Erreur de clôture"); return; }
 
     setOpenTx((prev) => prev.filter((t) => t.id !== editingId));
     cancelEdit();
+    } finally { setIsSaving(false); }
   }
 
   // --- FETCHS INIT ---
@@ -325,15 +332,39 @@ export default function TransactionsPage() {
     })();
   }, [selectedPlan]);
 
-  // liste des transactions (ouvertes)
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  async function loadTransactions(cursor?: string) {
+    const url = cursor
+      ? `/api/transactions?limit=20&cursor=${cursor}`
+      : "/api/transactions?limit=20";
+    const r = await fetch(url, { cache: "no-store" });
+    const j = await r.json();
+    setNextCursor(j.nextCursor ?? null);
+    return (j.transactions ?? []) as any[];
+  }
+
   useEffect(() => {
     (async () => {
-      const r = await fetch("/api/transactions", { cache: "no-store" });
-      const j = await r.json();
-      const txs = j.transactions ?? [];
+      const txs = await loadTransactions();
       setOpenTx(txs.filter((t: any) => t.status === "open"));
     })();
-  }, [message]); // recharge après création
+  }, [message]);
+
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const txs = await loadTransactions(nextCursor);
+      setOpenTx((prev) => {
+        const ids = new Set(prev.map((t) => t.id));
+        return [...prev, ...txs.filter((t: any) => t.status === "open" && !ids.has(t.id))];
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   // check/uncheck une étape
   function toggleStep(id: string) {
@@ -405,8 +436,12 @@ export default function TransactionsPage() {
     );
   }
 
+  const pagedTx = openTx.slice(txDisplayPage * TX_PER_PAGE, (txDisplayPage + 1) * TX_PER_PAGE);
+  const totalTxPages = Math.max(1, Math.ceil(openTx.length / TX_PER_PAGE));
+
   return (
     <main className="pb-20 min-h-screen p-4 bg-gray-950 text-gray-100">
+      <Toast message={toast} onClear={() => setToast("")} />
       <div className="max-w-xl mx-auto grid gap-8">
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -501,9 +536,9 @@ export default function TransactionsPage() {
                 onChange={(e) => setEmotionBefore(e.target.value)}
               >
                 <option value="">-- Choisir une émotion --</option>
-                <option value="indecis">indecis</option>
                 <option value="confiant">confiant</option>
-                <option value="mitigé">mitigé</option>
+                <option value="stressé">stressé</option>
+                <option value="indécis">indécis</option>
               </Select>
             </div>
 
@@ -535,7 +570,7 @@ export default function TransactionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {openTx.map((tx) => (
+                {pagedTx.map((tx) => (
                   <Fragment key={tx.id}>
                     <tr className="border-t border-gray-800 hover:bg-gray-800/30 transition">
                       <td className="py-2 px-2">{tx.asset}</td>
@@ -687,9 +722,9 @@ export default function TransactionsPage() {
                                 <option value="">
                                   -- Choisir une émotion --
                                 </option>
-                                <option value="Confiant">😎 Confiant</option>
-                                <option value="Stressé">😬 Stressé</option>
-                                <option value="Indécis">🤔 Indécis</option>
+                                <option value="confiant">😎 confiant</option>
+                                <option value="stressé">😬 stressé</option>
+                                <option value="indécis">🤔 indécis</option>
                               </Select>
                             </div>
 
@@ -732,9 +767,9 @@ export default function TransactionsPage() {
                                 }
                               >
                                 <option value="">— Non renseigné —</option>
-                                <option value="Confiant">😎 Confiant</option>
-                                <option value="Stressé">😬 Stressé</option>
-                                <option value="Indécis">🤔 Indécis</option>
+                                <option value="confiant">😎 confiant</option>
+                                <option value="stressé">😬 stressé</option>
+                                <option value="indécis">🤔 indécis</option>
                               </Select>
                             </div>
 
@@ -787,17 +822,19 @@ export default function TransactionsPage() {
                             <button
                               onClick={saveEdit}
                               type="button"
-                              className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-sm"
+                              disabled={isSaving}
+                              className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm"
                             >
-                              Enregistrer
+                              {isSaving ? "..." : "Enregistrer"}
                             </button>
                             <button
                               onClick={closeEdit}
                               type="button"
-                              className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-sm"
+                              disabled={isSaving}
+                              className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm"
                               title="Clôturer la transaction"
                             >
-                              Clôturer
+                              {isSaving ? "..." : "Clôturer"}
                             </button>
                           </div>
                         </td>
@@ -807,6 +844,34 @@ export default function TransactionsPage() {
                 ))}
               </tbody>
             </table>
+
+            {totalTxPages > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-3 text-sm">
+                <button
+                  onClick={() => setTxDisplayPage((p) => Math.max(0, p - 1))}
+                  disabled={txDisplayPage === 0}
+                  className="px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40"
+                >←</button>
+                <span className="text-gray-400">{txDisplayPage + 1} / {totalTxPages}</span>
+                <button
+                  onClick={() => setTxDisplayPage((p) => Math.min(totalTxPages - 1, p + 1))}
+                  disabled={txDisplayPage >= totalTxPages - 1}
+                  className="px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40"
+                >→</button>
+              </div>
+            )}
+
+            {nextCursor && (
+              <div className="mt-3 flex justify-center">
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="rounded-lg px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm text-gray-200 disabled:opacity-50"
+                >
+                  {loadingMore ? "Chargement..." : "Charger plus depuis le serveur"}
+                </button>
+              </div>
+            )}
           </section>
         )}
       </div>

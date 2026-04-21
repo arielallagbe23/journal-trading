@@ -9,7 +9,7 @@ export async function DELETE(
 ) {
   const { assetId } = await params; // 👈
   try {
-    const userId = await requireUserId(req);
+    const userId = requireUserId(req);
     const doc = await adminDb.collection("assets").doc(assetId).get();
     const a = doc.exists ? doc.data() as any : null;
     if (!a || a.userId !== userId) {

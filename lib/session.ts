@@ -8,8 +8,15 @@ export const SESSION_COOKIE = "session";
 const SECRET = process.env.SESSION_SECRET;
 
 const g: any = globalThis as any;
-const _sessions: Map<string, string> = g.__SESSIONS__ ?? new Map(); // token -> userId
+
+// dev: token -> { userId, expiresAt }
+const _sessions: Map<string, { userId: string; expiresAt: number }> =
+  g.__SESSIONS__ ?? new Map();
 if (!g.__SESSIONS__) g.__SESSIONS__ = _sessions;
+
+// blacklist jti pour la révocation au logout (prod + dev)
+const _blacklist: Set<string> = g.__SESSION_BLACKLIST__ ?? new Set();
+if (!g.__SESSION_BLACKLIST__) g.__SESSION_BLACKLIST__ = _blacklist;
 
 // --- utils base64url ---
 function b64url(buf: Buffer | string) {
@@ -34,6 +41,11 @@ function makeSignedToken(userId: string, ttlSec = 60 * 60 * 24 * 7) {
   return `${toSign}.${b64url(sig)}`;
 }
 
+function extractPayload(p: string): any | null {
+  try { return JSON.parse(b64urlToBuf(p).toString("utf8")); }
+  catch { return null; }
+}
+
 function verifySignedToken(token?: string | null): string | null {
   if (!token) return null;
   const parts = token.split(".");
@@ -43,51 +55,48 @@ function verifySignedToken(token?: string | null): string | null {
   const toSign = `${h}.${p}`;
   const expected = createHmac("sha256", SECRET!).update(toSign).digest();
   let got: Buffer;
-  try {
-    got = b64urlToBuf(s);
-  } catch {
-    return null;
-  }
-  if (expected.length !== got.length) return null;
-  if (!timingSafeEqual(expected, got)) return null;
+  try { got = b64urlToBuf(s); } catch { return null; }
+  try { if (!timingSafeEqual(expected, got)) return null; } catch { return null; }
 
-  try {
-    const payload = JSON.parse(b64urlToBuf(p).toString("utf8"));
-    if (typeof payload?.sub !== "string") return null;
-    if (typeof payload?.exp !== "number") return null;
-    if (Math.floor(Date.now() / 1000) > payload.exp) return null; // expiré
-    return payload.sub as string;
-  } catch {
-    return null;
-  }
+  const payload = extractPayload(p);
+  if (!payload) return null;
+  if (typeof payload.sub !== "string") return null;
+  if (typeof payload.exp !== "number") return null;
+  if (Math.floor(Date.now() / 1000) > payload.exp) return null;
+  if (payload.jti && _blacklist.has(payload.jti)) return null; // révoqué
+
+  return payload.sub as string;
 }
 
-// --- API publique (signatures inchangées, sync) ---
+const DEV_TTL_SEC = 60 * 60 * 24 * 7; // 7 jours (identique aux tokens signés)
+
+// --- API publique ---
 export function createSession(userId: string) {
-  if (SECRET) {
-    // stateless, aucun stockage serveur
-    return makeSignedToken(userId);
-  }
-  // fallback dev: mémoire
+  if (SECRET) return makeSignedToken(userId);
   const token = crypto.randomUUID();
-  _sessions.set(token, userId);
+  _sessions.set(token, { userId, expiresAt: Date.now() + DEV_TTL_SEC * 1000 });
   return token;
 }
 
 export function getUserIdByToken(token?: string | null) {
-  if (SECRET) {
-    return verifySignedToken(token);
-  }
+  if (SECRET) return verifySignedToken(token);
   if (!token) return null;
-  return _sessions.get(token) ?? null;
+  const entry = _sessions.get(token);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { _sessions.delete(token); return null; }
+  return entry.userId;
 }
 
 export function destroySession(token?: string | null) {
+  if (!token) return;
   if (SECRET) {
-    // stateless: rien à révoquer côté serveur.
-    // Le logout se fait en effaçant le cookie (ce que tu fais déjà).
+    // révoque le token signé via son jti
+    const parts = token.split(".");
+    if (parts.length === 3) {
+      const payload = extractPayload(parts[1]);
+      if (payload?.jti) _blacklist.add(payload.jti);
+    }
     return;
   }
-  if (!token) return;
   _sessions.delete(token);
 }

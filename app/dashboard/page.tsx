@@ -4,9 +4,10 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import LoadingSpinner from "./LoadingSpinner";
 
+import type { PublicUser } from "@/lib/types";
 type Me =
   | { authenticated: false }
-  | { authenticated: true; user: { email?: string | null; nickname?: string | null } | null };
+  | { authenticated: true; user: PublicUser | null };
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -116,18 +117,12 @@ export default function DashboardPage() {
             📜 Historique des transactions
           </a>
 
-          {/* Profil placeholder */}
-          <button
-            type="button"
-            onClick={() =>
-              alert("👤 Profil utilisateur — en cours de développement.")
-            }
+          <a
+            href="/profile"
             className="w-full rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-5 text-center text-lg font-medium hover:bg-gray-800 active:bg-gray-700 transition"
-            aria-label="Profil utilisateur (en cours de développement)"
           >
             👤 Profil utilisateur
-            <span className="ml-2 text-sm text-gray-400">(en cours de dev)</span>
-          </button>
+          </a>
         </section>
 
         {/* Déconnexion */}

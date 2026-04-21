@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, useCallback } from "react";
+import Toast from "@/app/components/Toast";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -31,6 +32,7 @@ export default function HistoryPage() {
   const router = useRouter();
   const [closedTx, setClosedTx] = useState<Tx[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
@@ -118,7 +120,7 @@ export default function HistoryPage() {
       const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        alert(j?.error ?? "Suppression impossible");
+        setToast(j?.error ?? "Suppression impossible");
         return;
       }
       // MAJ optimiste locale
@@ -129,12 +131,13 @@ export default function HistoryPage() {
         return Math.min(p, Math.max(1, newTotal));
       });
     } catch {
-      alert("Erreur réseau pendant la suppression");
+      setToast("Erreur réseau pendant la suppression");
     }
   }
 
   return (
     <main className="min-h-screen p-4 bg-gray-950 text-gray-100">
+      <Toast message={toast} onClear={() => setToast("")} />
       <div className="max-w-xl mx-auto grid gap-6">
         <div className="flex items-center gap-3">
           <button

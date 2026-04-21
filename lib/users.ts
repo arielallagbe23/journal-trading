@@ -2,7 +2,7 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { randomUUID as nodeRandomUUID } from "crypto";
 
-export type User = { id: string; email: string; passwordHash: string; nickname: string };
+export type User = { id: string; email: string; passwordHash: string; nickname: string; emailVerified?: boolean };
 
 const globalAny = globalThis as any;
 
@@ -100,14 +100,16 @@ function genId() {
   return nodeRandomUUID();
 }
 
-export function saveUser(user: { email: string; passwordHash: string; nickname: string }) {
+export async function saveUser(user: { email: string; passwordHash: string; nickname: string }): Promise<User> {
   const email = normalizeEmail(user.email);
 
-  // check rapide en mémoire pour limiter les doublons évidents
-  if (_usersByEmail.has(email)) {
-    // on retourne l’existant pour rester non-bloquant (optionnel),
-    // ou on pourrait throw une erreur sync. Ici je retourne l’existant.
-    return _usersByEmail.get(email)!;
+  if (_usersByEmail.has(email)) throw new Error("EMAIL_TAKEN");
+
+  // vérification Firestore pour couvrir les races inter-process
+  const existing = await adminDb.collection("users").where("email", "==", email).limit(1).get();
+  if (!existing.empty) {
+    putInCaches(existing.docs[0].data() as User);
+    throw new Error("EMAIL_TAKEN");
   }
 
   const u: User = {
@@ -117,24 +119,16 @@ export function saveUser(user: { email: string; passwordHash: string; nickname: 
     nickname: user.nickname,
   };
 
-  // write-through en mémoire
   putInCaches(u);
 
-  // persistance en arrière-plan
-  (async () => {
-    try {
-      // NOTE: ceci n’empêche PAS les races inter-process.
-      // Pour empêcher les doublons à coup sûr :
-      // - utiliser une transaction et réserver doc emails/{email}
-      // - ou utiliser emails comme ID du user (docId = email)
-      await adminDb.collection("users").doc(u.id).set(u);
-    } catch (err) {
-      console.error("Firestore persist failed:", err);
-      // option: rollback cache si l’écriture échoue
-      // _usersByEmail.delete(email);
-      // _usersById.delete(u.id);
-    }
-  })();
+  try {
+    await adminDb.collection("users").doc(u.id).set(u);
+  } catch (err) {
+    console.error("Firestore persist failed:", err);
+    _usersByEmail.delete(email);
+    _usersById.delete(u.id);
+    throw err;
+  }
 
   return u;
 }
@@ -147,6 +141,22 @@ export async function findUserByEmailOrFetch(email: string) {
   const snap = await adminDb.collection("users").where("email", "==", normalized).limit(1).get();
   if (snap.empty) return undefined;
   return putInCaches(snap.docs[0].data() as User);
+}
+
+export async function updateNickname(userId: string, nickname: string): Promise<User | undefined> {
+  const docRef = adminDb.collection("users").doc(userId);
+  const doc = await docRef.get();
+  if (!doc.exists) return undefined;
+  await docRef.update({ nickname });
+  const updated = putInCaches({ ...(doc.data() as User), nickname });
+  return updated;
+}
+
+export async function markEmailVerified(userId: string): Promise<void> {
+  const docRef = adminDb.collection("users").doc(userId);
+  await docRef.update({ emailVerified: true });
+  const doc = await docRef.get();
+  if (doc.exists) putInCaches(doc.data() as User);
 }
 
 export async function updateUserPasswordHash(userId: string, passwordHash: string) {

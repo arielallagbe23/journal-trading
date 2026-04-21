@@ -7,16 +7,25 @@ export const fetchCache = "force-no-store"; // optionnel
 
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { findUserByEmail } from "@/lib/users"; // <- sans "s"
+import { findUserByEmailOrFetch } from "@/lib/users";
 import { createSession, SESSION_COOKIE } from "@/lib/session";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
-const DUMMY_HASH =
-  process.env.DUMMY_BCRYPT_HASH ??
-  "$2a$12$d4iH4rUoG2nQ3cG1kq0hJuv2l0b0v0y5qVZt2YwX2gYy4bK0T2mde";
+if (!process.env.DUMMY_BCRYPT_HASH) {
+  throw new Error(
+    'Missing DUMMY_BCRYPT_HASH in .env.local — génère-en un avec : node -e "require(\'bcryptjs\').hash(\'dummy\',12).then(console.log)"'
+  );
+}
+const DUMMY_HASH = process.env.DUMMY_BCRYPT_HASH;
 
 export async function POST(req: NextRequest) {
-  if (req.method !== "POST") {
-    return NextResponse.json({ error: "Méthode non autorisée" }, { status: 405 });
+  const ip = getClientIp(req);
+  const { allowed, retryAfter } = checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Trop de tentatives. Réessaie dans " + retryAfter + "s" },
+      { status: 429 }
+    );
   }
 
   let body: any;
@@ -31,7 +40,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "email et password requis" }, { status: 400 });
   }
 
-  const user = findUserByEmail(email);
+  const user = await findUserByEmailOrFetch(email);
   const hashToCheck = user?.passwordHash ?? DUMMY_HASH;
   const ok = await bcrypt.compare(password, hashToCheck);
 

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, LogOut, Settings, LayoutDashboard, LogIn, UserPlus } from "lucide-react";
 
-type User = { id?: string; email: string; nickname: string };
+import type { PublicUser } from "@/lib/types";
+type User = PublicUser;
 
 export default function Home() {
   const router = useRouter();

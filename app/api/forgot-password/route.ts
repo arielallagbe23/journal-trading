@@ -1,49 +1,44 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
-import { findUserByEmailOrFetch, updateUserPasswordHash } from "@/lib/users";
+import { findUserByEmailOrFetch } from "@/lib/users";
+import { createResetToken } from "@/lib/passwordReset";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function POST(req: NextRequest) {
-  let body: { email?: string; newPassword?: string };
+  const ip = getClientIp(req);
+  const { allowed, retryAfter } = checkRateLimit(`forgot:${ip}`, 5, 15 * 60 * 1000);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Trop de tentatives. Réessaie dans " + retryAfter + "s" },
+      { status: 429 }
+    );
+  }
+
+  let body: { email?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
-  const email = typeof body.email === "string" ? body.email : "";
-  const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
-
-  if (!email.trim() || !newPassword.trim()) {
-    return NextResponse.json({ error: "email et nouveau mot de passe requis" }, { status: 400 });
-  }
-  if (newPassword.length < 8) {
-    return NextResponse.json({ error: "Mot de passe trop court (8 caractères min)" }, { status: 400 });
+  const email = typeof body.email === "string" ? body.email.trim() : "";
+  if (!email) {
+    return NextResponse.json({ error: "email requis" }, { status: 400 });
   }
 
-  let user;
-  try {
-    user = await findUserByEmailOrFetch(email);
-  } catch (err) {
-    console.error("Forgot password lookup failed:", err);
-    return NextResponse.json({ error: "SERVICE_INDISPONIBLE" }, { status: 500 });
-  }
+  // Réponse identique qu'un email existe ou non (évite l'énumération d'emails)
+  const user = await findUserByEmailOrFetch(email).catch(() => null);
   if (!user) {
-    // simple retour pour cette première version
-    return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
+    return NextResponse.json({ ok: true });
   }
 
-  const hash = await bcrypt.hash(newPassword, 10);
-  let updated;
-  try {
-    updated = await updateUserPasswordHash(user.id, hash);
-  } catch (err) {
-    console.error("Forgot password update failed:", err);
-    return NextResponse.json({ error: "SERVICE_INDISPONIBLE" }, { status: 500 });
-  }
-  if (!updated) {
-    return NextResponse.json({ error: "Impossible de mettre à jour ce compte" }, { status: 500 });
+  const token = await createResetToken(user.id);
+
+  // En production: envoyer le token par email (SMTP / Resend / SendGrid)
+  // En dev: retourner le token directement pour les tests
+  if (process.env.NODE_ENV !== "production") {
+    return NextResponse.json({ ok: true, devOnlyResetToken: token });
   }
 
   return NextResponse.json({ ok: true });

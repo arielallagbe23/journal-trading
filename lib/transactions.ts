@@ -91,9 +91,32 @@ export async function addTransaction(input: {
 }
 
 // --- READ ---
-export async function getTransactionsByUser(userId: string): Promise<Transaction[]> {
-  const snap = await adminDb.collection("transactions").where("userId", "==", userId).get();
-  return snap.docs.map((d) => d.data() as Transaction);
+// Nécessite un index Firestore composite: userId ASC + dateIn DESC
+// (Firestore affiche le lien de création dans les logs d'erreur au premier appel)
+export async function getTransactionsByUser(
+  userId: string,
+  options: { limit?: number; cursor?: string } = {}
+): Promise<{ transactions: Transaction[]; nextCursor: string | null }> {
+  const pageSize = Math.min(options.limit ?? 20, 100);
+
+  let query = adminDb
+    .collection("transactions")
+    .where("userId", "==", userId)
+    .orderBy("dateIn", "desc")
+    .limit(pageSize + 1);
+
+  if (options.cursor) {
+    const cursorDoc = await adminDb.collection("transactions").doc(options.cursor).get();
+    if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+  }
+
+  const snap = await query.get();
+  const docs = snap.docs.map((d) => d.data() as Transaction);
+  const hasMore = docs.length > pageSize;
+  const transactions = hasMore ? docs.slice(0, pageSize) : docs;
+  const nextCursor = hasMore ? transactions[transactions.length - 1].id : null;
+
+  return { transactions, nextCursor };
 }
 
 export async function getTransactionById(id: string): Promise<Transaction | null> {

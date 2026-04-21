@@ -206,16 +206,18 @@ export default function SettingsPage() {
     refreshSteps(activePlanId);
   }
   async function deleteStep(id: string) {
-    await fetch(`/api/steps/${id}`, { method: "DELETE" });
-    if (activePlanId) refreshSteps(activePlanId);
+    if (!activePlanId) return;
+    await fetch(`/api/plans/${activePlanId}/steps/${id}`, { method: "DELETE" });
+    refreshSteps(activePlanId);
   }
   async function renameStep(id: string, title: string) {
-    await fetch(`/api/steps/${id}`, {
+    if (!activePlanId) return;
+    await fetch(`/api/plans/${activePlanId}/steps/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title }),
     });
-    if (activePlanId) refreshSteps(activePlanId);
+    refreshSteps(activePlanId);
   }
   async function moveStep(idx: number, dir: -1 | 1) {
     if (!activePlanId) return;
