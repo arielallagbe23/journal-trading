@@ -107,6 +107,13 @@ export default function DashboardPage() {
           </a>
 
           <a
+            href="/news"
+            className="w-full rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-5 text-center text-lg font-medium hover:bg-gray-800 active:bg-gray-700 transition"
+          >
+            📰 News
+          </a>
+
+          <a
             href="/profile"
             className="w-full rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-5 text-center text-lg font-medium hover:bg-gray-800 active:bg-gray-700 transition"
           >
