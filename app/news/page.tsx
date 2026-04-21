@@ -363,10 +363,25 @@ export default function NewsPage() {
 
         {/* Legend */}
         {!calLoading && !calError && (
-          <div className="flex gap-4 text-xs text-gray-600 justify-center">
-            <span>🇺🇸 USD · 🇯🇵 JPY · 🇨🇳 CNY inclus</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Fort</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Moyen</span>
+          <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 flex flex-col gap-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Logique de vigilance</p>
+            <div className="flex flex-col gap-2 text-sm">
+              <div className="flex items-start gap-3">
+                <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-rose-900/70 text-rose-300">🔴 Critique</span>
+                <span className="text-gray-400">Event Fort <span className="text-gray-600">ou</span> mots-clés <span className="text-gray-300">NFP · FOMC · BOJ · CPI · GDP · PCE · Powell · Ueda</span></span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-900/60 text-amber-300">⚠️ Haute</span>
+                <span className="text-gray-400">Events à impact <span className="text-gray-300">Moyen</span> présents</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-900/50 text-emerald-400">✅ Calme</span>
+                <span className="text-gray-400">Rien ou <span className="text-gray-300">Faible JPY</span> uniquement</span>
+              </div>
+            </div>
+            <div className="border-t border-gray-800 pt-2 flex gap-3 text-xs text-gray-600 flex-wrap">
+              <span>🇺🇸 USD · 🇯🇵 JPY (tous impacts) · 🇨🇳 CNY (Moyen+)</span>
+            </div>
           </div>
         )}
 
