@@ -1,6 +1,7 @@
 const g = globalThis as typeof globalThis & Record<string, unknown>;
-const _store: Map<string, { count: number; resetAt: number }> =
-  g.__RATE_LIMIT_STORE__ ?? new Map();
+type RateLimitStore = Map<string, { count: number; resetAt: number }>;
+const _store: RateLimitStore =
+  (g.__RATE_LIMIT_STORE__ as RateLimitStore | undefined) ?? new Map();
 if (!g.__RATE_LIMIT_STORE__) g.__RATE_LIMIT_STORE__ = _store;
 
 export function checkRateLimit(
