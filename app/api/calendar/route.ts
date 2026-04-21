@@ -37,9 +37,10 @@ export async function GET() {
 
     const data: FFEvent[] = await res.json();
 
+    // USD + JPY directs, CNY indirect (1er partenaire commercial du Japon → bouge le JPY)
     const filtered = data.filter(
       (e) =>
-        (e.country === "USD" || e.country === "JPY") &&
+        (e.country === "USD" || e.country === "JPY" || e.country === "CNY") &&
         (e.impact === "Medium" || e.impact === "High")
     );
 

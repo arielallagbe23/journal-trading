@@ -9,6 +9,21 @@ type BiasData = { bias: "up" | "down" | "neutral"; summary: string } | null;
 
 const DAY_LABELS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
+// Devises affichées dans cet ordre dans le récap
+const CURRENCY_ORDER = ["USD", "JPY", "CNY"] as const;
+
+const FLAG: Record<string, string> = {
+  USD: "🇺🇸",
+  JPY: "🇯🇵",
+  CNY: "🇨🇳",
+};
+
+const CURRENCY_LABEL: Record<string, string> = {
+  USD: "Dollar américain",
+  JPY: "Yen japonais",
+  CNY: "Yuan chinois · impact indirect JPY",
+};
+
 function toParisDKey(d: Date): string {
   const str = d.toLocaleDateString("fr-FR", {
     timeZone: "Europe/Paris",
@@ -43,13 +58,13 @@ function BiasBadge({ b }: { b: "up" | "down" | "neutral" }) {
 function ImpactPill({ impact }: { impact: "Medium" | "High" }) {
   if (impact === "High")
     return (
-      <span className="px-1.5 py-0.5 rounded text-xs font-semibold" style={{ backgroundColor: "#FCEBEB", color: "#A32D2D" }}>
-        Fort
+      <span className="px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap" style={{ backgroundColor: "#FCEBEB", color: "#A32D2D" }}>
+        ● Fort
       </span>
     );
   return (
-    <span className="px-1.5 py-0.5 rounded text-xs font-semibold" style={{ backgroundColor: "#FAEEDA", color: "#854F0B" }}>
-      Moyen
+    <span className="px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap" style={{ backgroundColor: "#FAEEDA", color: "#854F0B" }}>
+      ● Moyen
     </span>
   );
 }
@@ -78,7 +93,7 @@ export default function NewsPage() {
       const j = await r.json() as { ok: boolean; bias?: "up" | "down" | "neutral"; summary?: string };
       if (j.ok && j.bias && j.summary) setBias({ bias: j.bias, summary: j.summary });
     } catch {
-      // graceful degradation — pas de crash si l'API Claude échoue
+      // graceful degradation
     } finally {
       setBiasLoading(false);
     }
@@ -109,7 +124,7 @@ export default function NewsPage() {
   const todayEvents = grouped[todayKey] ?? [];
 
   return (
-    <main className="min-h-screen bg-gray-950 text-gray-100 p-4 pb-10">
+    <main className="min-h-screen bg-gray-950 text-gray-100 p-4 pb-12">
       <div className="max-w-xl mx-auto flex flex-col gap-4">
 
         {/* Header */}
@@ -124,10 +139,7 @@ export default function NewsPage() {
         {calError && (
           <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-6 text-center flex flex-col gap-3">
             <p className="text-gray-400 text-sm">Données indisponibles</p>
-            <button
-              onClick={fetchCalendar}
-              className="mx-auto flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"
-            >
+            <button onClick={fetchCalendar} className="mx-auto flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm">
               <RefreshCw className="w-4 h-4" /> Réessayer
             </button>
           </div>
@@ -147,7 +159,7 @@ export default function NewsPage() {
               return (
                 <div
                   key={key}
-                  className="rounded-xl bg-gray-900/60 p-2 flex flex-col items-center gap-1 transition-opacity"
+                  className="rounded-xl bg-gray-900/60 p-2 flex flex-col items-center gap-1"
                   style={{
                     border: isToday ? "2px solid #6366f1" : "1px solid rgb(31,41,55)",
                     opacity: isPast && !isToday ? 0.45 : 1,
@@ -174,28 +186,22 @@ export default function NewsPage() {
         {/* Loading */}
         {calLoading && !calError && (
           <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-6 text-center">
-            <p className="text-gray-400 text-sm animate-pulse">Chargement du calendrier...</p>
+            <p className="text-gray-400 text-sm animate-pulse">Chargement du calendrier…</p>
           </div>
         )}
 
         {/* Today recap card */}
         {!calLoading && !calError && (
-          <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 flex flex-col gap-3">
+          <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 flex flex-col gap-4">
 
             {/* Card header */}
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-sm">Aujourd'hui · USD/JPY</span>
+                <span className="font-bold text-base">Aujourd'hui · USD/JPY</span>
                 {bias && !biasLoading && <BiasBadge b={bias.bias} />}
-                {biasLoading && (
-                  <span className="text-xs text-gray-500 animate-pulse">Analyse en cours…</span>
-                )}
+                {biasLoading && <span className="text-xs text-gray-500 animate-pulse">Analyse en cours…</span>}
               </div>
-              <button
-                onClick={fetchCalendar}
-                className="text-gray-500 hover:text-indigo-400 transition shrink-0"
-                title="Rafraîchir"
-              >
+              <button onClick={fetchCalendar} className="text-gray-500 hover:text-indigo-400 transition shrink-0" title="Rafraîchir">
                 <RefreshCw className="w-4 h-4" />
               </button>
             </div>
@@ -207,36 +213,77 @@ export default function NewsPage() {
               </p>
             )}
 
-            {/* Separator */}
-            <div className="border-t border-gray-800" />
-
-            {/* Events */}
-            {todayEvents.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-2">
-                Aucun événement majeur USD/JPY aujourd'hui.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2.5">
-                {todayEvents.map((e, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm min-w-0">
-                    <span className="text-gray-400 tabular-nums shrink-0 text-xs">{e.parisTime}</span>
-                    <span className="flex-1 text-gray-100 truncate">{e.title}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-xs text-gray-500 font-medium">{e.country}</span>
-                      <ImpactPill impact={e.impact} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
+            {/* No events */}
+            {todayEvents.length === 0 && (
+              <p className="text-gray-500 text-sm text-center py-2">Aucun événement majeur USD/JPY aujourd'hui.</p>
             )}
+
+            {/* Events grouped by currency */}
+            {CURRENCY_ORDER.map((currency) => {
+              const events = todayEvents.filter((e) => e.country === currency);
+              if (!events.length) return null;
+
+              return (
+                <div key={currency} className="flex flex-col gap-2">
+                  {/* Currency header */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl leading-none">{FLAG[currency]}</span>
+                    <div>
+                      <span className="text-sm font-bold text-gray-100">{currency}</span>
+                      <span className="text-xs text-gray-500 ml-2">{CURRENCY_LABEL[currency]}</span>
+                    </div>
+                    <span className="ml-auto text-xs text-gray-600 tabular-nums">
+                      {events.length} événement{events.length > 1 ? "s" : ""}
+                    </span>
+                  </div>
+
+                  {/* Event cards */}
+                  {events.map((e, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg bg-gray-950/70 border border-gray-800 p-3 flex items-start gap-3"
+                      style={{ borderLeft: `3px solid ${e.impact === "High" ? "#ef4444" : "#f59e0b"}` }}
+                    >
+                      {/* Time */}
+                      <div className="shrink-0 flex flex-col items-center pt-0.5">
+                        <span className="text-xs font-mono font-semibold text-gray-300">{e.parisTime}</span>
+                        <span className="text-xs text-gray-600">Paris</span>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="w-px self-stretch bg-gray-800 shrink-0" />
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 flex flex-col gap-1">
+                        <p className="text-sm font-semibold text-gray-100 leading-snug">{e.title}</p>
+                        {(e.forecast || e.previous || e.actual) && (
+                          <div className="flex gap-3 text-xs text-gray-500 flex-wrap">
+                            {e.forecast && <span>Prévu <span className="text-gray-300 font-medium">{e.forecast}</span></span>}
+                            {e.previous && <span>Préc. <span className="text-gray-400">{e.previous}</span></span>}
+                            {e.actual && <span>Réel <span className="text-emerald-400 font-semibold">{e.actual}</span></span>}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Impact */}
+                      <div className="shrink-0 pt-0.5">
+                        <ImpactPill impact={e.impact} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+
           </div>
         )}
 
         {/* Legend */}
         {!calLoading && !calError && (
-          <div className="flex gap-4 text-xs text-gray-500 justify-center">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Fort impact</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Impact moyen</span>
+          <div className="flex gap-4 text-xs text-gray-600 justify-center">
+            <span>🇺🇸 USD · 🇯🇵 JPY · 🇨🇳 CNY inclus</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Fort</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Moyen</span>
           </div>
         )}
 
