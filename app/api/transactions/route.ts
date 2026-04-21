@@ -15,8 +15,9 @@ export async function GET(req: NextRequest) {
     const { transactions, nextCursor } = await getTransactionsByUser(uid, { limit, cursor });
     return NextResponse.json({ transactions, nextCursor });
   } catch (e) {
-    console.error("GET /api/transactions failed:", e);
-    return NextResponse.json({ error: "SERVER_ERROR" }, { status: 500 });
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("GET /api/transactions failed:", msg);
+    return NextResponse.json({ error: "SERVER_ERROR", detail: msg }, { status: 500 });
   }
 }
 
