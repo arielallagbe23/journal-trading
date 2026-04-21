@@ -4,7 +4,7 @@ import { randomUUID as nodeRandomUUID } from "crypto";
 
 export type User = { id: string; email: string; passwordHash: string; nickname: string; emailVerified?: boolean };
 
-const globalAny = globalThis as any;
+const globalAny = globalThis as typeof globalThis & Record<string, unknown>;
 
 // caches mémoire (par process)
 const _usersByEmail: Map<string, User> = globalAny.__USERS_BY_EMAIL__ ?? new Map();
@@ -91,9 +91,9 @@ export function findUserById(id: string) {
 function genId() {
   // web crypto si dispo, sinon fallback Node
   try {
-    // @ts-ignore
+    // @ts-expect-error - crypto.randomUUID disponible en Node 19+ et navigateurs modernes
     if (typeof crypto !== "undefined" && crypto?.randomUUID) {
-      // @ts-ignore
+      // @ts-expect-error
       return crypto.randomUUID();
     }
   } catch {}

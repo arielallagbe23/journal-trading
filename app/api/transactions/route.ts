@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
   try { uid = requireUserId(req); }
   catch { return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 }); }
 
-  let body: any;
-  try { body = await req.json(); }
+  let body: Record<string, unknown>;
+  try { body = await req.json() as Record<string, unknown>; }
   catch { return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 }); }
 
   const { asset, timeframe, emotionBefore } = body ?? {};

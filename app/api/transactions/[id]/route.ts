@@ -21,10 +21,10 @@ export async function PATCH(
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     }
 
-    const patchBody: any = await req.json();
+    const patchBody = await req.json() as Record<string, unknown>;
 
     // Normalisation douce des champs
-    const normalized: any = { ...patchBody };
+    const normalized: Record<string, unknown> = { ...patchBody };
 
     if ("planId" in patchBody) {
       normalized.planId =

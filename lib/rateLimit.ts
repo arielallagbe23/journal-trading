@@ -1,4 +1,4 @@
-const g = globalThis as any;
+const g = globalThis as typeof globalThis & Record<string, unknown>;
 const _store: Map<string, { count: number; resetAt: number }> =
   g.__RATE_LIMIT_STORE__ ?? new Map();
 if (!g.__RATE_LIMIT_STORE__) g.__RATE_LIMIT_STORE__ = _store;

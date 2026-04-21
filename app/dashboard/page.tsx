@@ -21,13 +21,10 @@ export default function DashboardPage() {
     try {
       const res = await fetch("/api/me", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as unknown;
+      type MeApiResponse = { authenticated: boolean; user?: PublicUser | null };
+      const data = await res.json() as MeApiResponse;
 
-      // garde-fou de forme
-      const isAuth =
-        typeof (data as any)?.authenticated === "boolean"
-          ? (data as any).authenticated
-          : false;
+      const isAuth = typeof data?.authenticated === "boolean" ? data.authenticated : false;
 
       if (!isAuth) {
         setMe({ authenticated: false });
@@ -35,7 +32,7 @@ export default function DashboardPage() {
         return;
       }
 
-      const user = (data as any)?.user ?? null;
+      const user = data?.user ?? null;
       setMe({ authenticated: true, user });
     } catch (e: any) {
       setErr(e?.message ?? "Erreur inconnue");

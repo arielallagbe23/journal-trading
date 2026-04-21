@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent, ChangeEvent } from "react";
+import Link from "next/link";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -138,9 +139,9 @@ export default function SignupPage() {
 
         {/* 👇 lien de retour vers l'accueil */}
         <p className="text-sm text-center">
-          <a href="/" className="text-indigo-400 hover:underline">
+          <Link href="/" className="text-indigo-400 hover:underline">
             ← Retour à l’accueil
-          </a>
+          </Link>
         </p>
       </form>
     </main>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState, useRef, ChangeEvent, useCallback } from "react";
+import { Fragment, useEffect, useState, useRef, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
 import Toast from "@/app/components/Toast";
@@ -125,7 +125,7 @@ export default function TransactionsPage() {
     }
   }
 
-  function startEdit(tx: any) {
+  function startEdit(tx: typeof openTx[number]) {
     setEditingId(tx.id);
     setEditAsset(tx.asset ?? "");
     setEditTimeframe(tx.timeframe ?? "");
@@ -246,7 +246,7 @@ export default function TransactionsPage() {
               emotionBefore: editEmotionBefore,
               confidence: editConfidence,
               emotionAfter: editEmotionAfter || null,
-              result: (editResult as any) || null,
+              result: (editResult as "win" | "loss" | null) || null,
               profit: editProfit === "" ? null : Number(editProfit),
               planId: editSelectedPlan || null,
               checkedStepIds: editCheckedSteps,
@@ -342,13 +342,13 @@ export default function TransactionsPage() {
     const r = await fetch(url, { cache: "no-store" });
     const j = await r.json();
     setNextCursor(j.nextCursor ?? null);
-    return (j.transactions ?? []) as any[];
+    return (j.transactions ?? []) as typeof openTx;
   }
 
   useEffect(() => {
     (async () => {
       const txs = await loadTransactions();
-      setOpenTx(txs.filter((t: any) => t.status === "open"));
+      setOpenTx(txs.filter((t) => t.status === "open"));
     })();
   }, [message]);
 
@@ -359,7 +359,7 @@ export default function TransactionsPage() {
       const txs = await loadTransactions(nextCursor);
       setOpenTx((prev) => {
         const ids = new Set(prev.map((t) => t.id));
-        return [...prev, ...txs.filter((t: any) => t.status === "open" && !ids.has(t.id))];
+        return [...prev, ...txs.filter((t) => t.status === "open" && !ids.has(t.id))];
       });
     } finally {
       setLoadingMore(false);

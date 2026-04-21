@@ -7,7 +7,7 @@ export const SESSION_COOKIE = "session";
 // sinon -> fallback Map en mémoire (dev local)
 const SECRET = process.env.SESSION_SECRET;
 
-const g: any = globalThis as any;
+const g = globalThis as typeof globalThis & Record<string, unknown>;
 
 // dev: token -> { userId, expiresAt }
 const _sessions: Map<string, { userId: string; expiresAt: number }> =
@@ -41,7 +41,7 @@ function makeSignedToken(userId: string, ttlSec = 60 * 60 * 24 * 7) {
   return `${toSign}.${b64url(sig)}`;
 }
 
-function extractPayload(p: string): any | null {
+function extractPayload(p: string): Record<string, unknown> | null {
   try { return JSON.parse(b64urlToBuf(p).toString("utf8")); }
   catch { return null; }
 }

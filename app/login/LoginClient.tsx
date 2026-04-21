@@ -1,12 +1,11 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState, FormEvent, ChangeEvent } from "react";
+import Link from "next/link";
 
 export default function LoginClient() {
   const router = useRouter();
-  const search = useSearchParams(); // ✅ OK dans un client component
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
@@ -100,9 +99,9 @@ export default function LoginClient() {
 
         {/* 👇 lien de retour vers l'accueil */}
         <p className="text-sm text-center">
-          <a href="/" className="text-indigo-400 hover:underline">
+          <Link href="/" className="text-indigo-400 hover:underline">
             ← Retour à l’accueil
-          </a>
+          </Link>
         </p>
       </form>
     </main>

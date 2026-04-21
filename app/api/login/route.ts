@@ -28,14 +28,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: any;
+  let body: { email?: unknown; password?: unknown };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
   }
 
-  const { email, password } = body ?? {};
+  const email = typeof body.email === "string" ? body.email : "";
+  const password = typeof body.password === "string" ? body.password : "";
   if (!email || !password) {
     return NextResponse.json({ error: "email et password requis" }, { status: 400 });
   }

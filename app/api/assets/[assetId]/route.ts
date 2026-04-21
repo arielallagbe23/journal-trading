@@ -11,7 +11,7 @@ export async function DELETE(
   try {
     const userId = requireUserId(req);
     const doc = await adminDb.collection("assets").doc(assetId).get();
-    const a = doc.exists ? doc.data() as any : null;
+    const a = doc.exists ? (doc.data() as { userId: string }) : null;
     if (!a || a.userId !== userId) {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     }

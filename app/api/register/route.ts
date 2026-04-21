@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
       // En prod: envoyer par email. En dev: retourné directement.
       ...(process.env.NODE_ENV !== "production" ? { devOnlyVerifyToken: verifyToken } : {}),
     }, { status: 201 });
-  } catch (err: any) {
-    if (err?.message === "EMAIL_TAKEN")
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "EMAIL_TAKEN")
       return Response.json({ error: "email déjà utilisé" }, { status: 409 });
     return Response.json({ error: "invalid JSON body" }, { status: 400 });
   }
