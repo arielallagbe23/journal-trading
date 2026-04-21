@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       asset,
       timeframe,
       emotionBefore,
-      confidence: body.confidence ?? null,
+      confidence: body.confidence === true ? true : body.confidence === false ? false : null,
 
       // 👇 passe au nouveau contrat: le lib recalcule respectPlan
       planId,
