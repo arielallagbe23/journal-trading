@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import type { CalendarEvent } from "@/app/api/calendar/route";
+import type { NewsArticle } from "@/app/api/news/route";
 
 type BiasData = { bias: "up" | "down" | "neutral"; summary: string } | null;
 
@@ -116,6 +117,8 @@ export default function NewsPage() {
   const [calError, setCalError] = useState(false);
   const [bias, setBias] = useState<BiasData>(null);
   const [biasLoading, setBiasLoading] = useState(false);
+  const [articles, setArticles] = useState<NewsArticle[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
 
   const fetchBias = useCallback(async (events: CalendarEvent[]) => {
     if (!events.length) return;
@@ -156,6 +159,18 @@ export default function NewsPage() {
   useEffect(() => {
     fetchCalendar();
   }, [fetchCalendar]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch("/api/news");
+        const j = await r.json() as { ok: boolean; articles?: NewsArticle[] };
+        if (j.ok && j.articles) setArticles(j.articles);
+      } catch { /* silencieux */ } finally {
+        setNewsLoading(false);
+      }
+    })();
+  }, []);
 
   const todayEvents = grouped[todayKey] ?? [];
 
@@ -361,55 +376,59 @@ export default function NewsPage() {
           </div>
         )}
 
-        {/* Ressources lecture */}
-        {!calLoading && !calError && (
-          <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 flex flex-col gap-3">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">📖 Lecture rapide — 15min max</p>
-            <div className="flex flex-col gap-2">
-              {[
-                {
-                  label: "ForexLive · USD/JPY",
-                  desc: "Réactions live aux news — indispensable les jours Critique",
-                  url: "https://www.forexlive.com/tag/usdjpy/",
-                  badge: "🔴 Critique",
-                  badgeClass: "bg-rose-900/50 text-rose-300",
-                },
-                {
-                  label: "Reuters · Marchés",
-                  desc: "FOMC, BOJ — lire uniquement les jours d'événements majeurs",
-                  url: "https://www.reuters.com/markets/currencies/",
-                  badge: "🔴 Critique",
-                  badgeClass: "bg-rose-900/50 text-rose-300",
-                },
-                {
-                  label: "Investing.com · USD/JPY News",
-                  desc: "Commentaires post-news et consensus de marché",
-                  url: "https://fr.investing.com/currencies/usd-jpy-news",
-                  badge: "⚠️ Haute",
-                  badgeClass: "bg-amber-900/50 text-amber-300",
-                },
-              ].map((r) => (
-                <a
-                  key={r.url}
-                  href={r.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 rounded-lg border border-gray-800 bg-gray-950/60 px-3 py-2.5 hover:border-indigo-500/50 transition group"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-100 group-hover:text-indigo-300 transition">{r.label}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{r.desc}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${r.badgeClass}`}>{r.badge}</span>
-                    <span className="text-gray-600 group-hover:text-indigo-400 transition text-lg">↗</span>
-                  </div>
-                </a>
+        {/* Actualités géopolitiques live */}
+        <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 flex flex-col gap-3">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">🌍 Actualités géopolitiques &amp; macro</p>
+
+          {newsLoading && (
+            <p className="text-gray-500 text-sm animate-pulse">Chargement des actualités…</p>
+          )}
+
+          {!newsLoading && articles.length === 0 && (
+            <p className="text-gray-500 text-sm">Aucune actualité pertinente trouvée.</p>
+          )}
+
+          {!newsLoading && articles.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {articles.map((a, i) => (
+                <li key={i}>
+                  <a
+                    href={a.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-start gap-3 rounded-lg border border-gray-800 bg-gray-950/60 px-3 py-2.5 hover:border-indigo-500/50 transition group"
+                  >
+                    {/* Tags */}
+                    <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0 w-12">
+                      <div className="flex flex-wrap gap-0.5 justify-center">
+                        {a.tags.map((tag, ti) => (
+                          <span key={ti} className="text-base leading-none">{tag}</span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="w-px self-stretch bg-gray-800 shrink-0" />
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-100 group-hover:text-indigo-300 transition leading-snug">
+                        {a.title}
+                      </p>
+                      <div className="flex gap-2 mt-1 text-xs text-gray-600">
+                        <span>{a.source}</span>
+                        <span>·</span>
+                        <span>{new Date(a.publishedAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                    </div>
+
+                    <span className="text-gray-600 group-hover:text-indigo-400 transition shrink-0 mt-0.5">↗</span>
+                  </a>
+                </li>
               ))}
-            </div>
-            <p className="text-xs text-gray-600">✅ Jour calme → rien à lire, analyse le chart directement.</p>
-          </div>
-        )}
+            </ul>
+          )}
+        </div>
 
         {/* Legend */}
         {!calLoading && !calError && (
