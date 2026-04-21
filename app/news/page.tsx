@@ -55,16 +55,22 @@ function BiasBadge({ b }: { b: "up" | "down" | "neutral" }) {
   return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-800 text-gray-300">— Neutre</span>;
 }
 
-function ImpactPill({ impact }: { impact: "Medium" | "High" }) {
+function ImpactPill({ impact }: { impact: "Low" | "Medium" | "High" }) {
   if (impact === "High")
     return (
       <span className="px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap" style={{ backgroundColor: "#FCEBEB", color: "#A32D2D" }}>
         ● Fort
       </span>
     );
+  if (impact === "Medium")
+    return (
+      <span className="px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap" style={{ backgroundColor: "#FAEEDA", color: "#854F0B" }}>
+        ● Moyen
+      </span>
+    );
   return (
-    <span className="px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap" style={{ backgroundColor: "#FAEEDA", color: "#854F0B" }}>
-      ● Moyen
+    <span className="px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap bg-gray-800 text-gray-400">
+      ● Faible
     </span>
   );
 }
@@ -153,6 +159,7 @@ export default function NewsPage() {
               const events = grouped[key] ?? [];
               const highCount = events.filter((e) => e.impact === "High").length;
               const medCount = events.filter((e) => e.impact === "Medium").length;
+              const lowCount = events.filter((e) => e.impact === "Low").length;
               const isToday = key === todayKey;
               const isPast = day < todayMidnight;
 
@@ -175,6 +182,9 @@ export default function NewsPage() {
                     ))}
                     {Array.from({ length: medCount }).map((_, i) => (
                       <span key={`m${i}`} className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    ))}
+                    {Array.from({ length: lowCount }).map((_, i) => (
+                      <span key={`l${i}`} className="w-1.5 h-1.5 rounded-full bg-gray-600" />
                     ))}
                   </div>
                 </div>
@@ -242,7 +252,7 @@ export default function NewsPage() {
                     <div
                       key={i}
                       className="rounded-lg bg-gray-950/70 border border-gray-800 p-3 flex items-start gap-3"
-                      style={{ borderLeft: `3px solid ${e.impact === "High" ? "#ef4444" : "#f59e0b"}` }}
+                      style={{ borderLeft: `3px solid ${e.impact === "High" ? "#ef4444" : e.impact === "Medium" ? "#f59e0b" : "#4b5563"}` }}
                     >
                       {/* Time */}
                       <div className="shrink-0 flex flex-col items-center pt-0.5">

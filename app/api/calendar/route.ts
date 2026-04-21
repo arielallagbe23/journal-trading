@@ -12,7 +12,7 @@ type FFEvent = {
 };
 
 export type CalendarEvent = FFEvent & {
-  impact: "Medium" | "High";
+  impact: "Low" | "Medium" | "High";
   parisTime: string;
 };
 
@@ -37,12 +37,13 @@ export async function GET() {
 
     const data: FFEvent[] = await res.json();
 
-    // USD + JPY directs, CNY indirect (1er partenaire commercial du Japon → bouge le JPY)
-    const filtered = data.filter(
-      (e) =>
-        (e.country === "USD" || e.country === "JPY" || e.country === "CNY") &&
-        (e.impact === "Medium" || e.impact === "High")
-    );
+    // JPY : tous impacts (Low inclus — certains events clés sont mal classés par FF)
+    // USD + CNY : Medium et High uniquement
+    const filtered = data.filter((e) => {
+      if (e.country === "JPY") return e.impact === "Low" || e.impact === "Medium" || e.impact === "High";
+      if (e.country === "USD" || e.country === "CNY") return e.impact === "Medium" || e.impact === "High";
+      return false;
+    });
 
     const grouped: Record<string, CalendarEvent[]> = {};
 
