@@ -34,8 +34,8 @@ export default function DashboardPage() {
 
       const user = data?.user ?? null;
       setMe({ authenticated: true, user });
-    } catch (e: any) {
-      setErr(e?.message ?? "Erreur inconnue");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
       setLoading(false);
     }

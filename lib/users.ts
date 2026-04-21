@@ -93,7 +93,7 @@ function genId() {
   try {
     // @ts-expect-error - crypto.randomUUID disponible en Node 19+ et navigateurs modernes
     if (typeof crypto !== "undefined" && crypto?.randomUUID) {
-      // @ts-expect-error
+      // @ts-expect-error - randomUUID non typé dans certaines cibles TS
       return crypto.randomUUID();
     }
   } catch {}
