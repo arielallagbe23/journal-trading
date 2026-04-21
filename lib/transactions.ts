@@ -91,32 +91,32 @@ export async function addTransaction(input: {
 }
 
 // --- READ ---
-// Nécessite un index Firestore composite: userId ASC + dateIn DESC
-// (Firestore affiche le lien de création dans les logs d'erreur au premier appel)
 export async function getTransactionsByUser(
   userId: string,
   options: { limit?: number; cursor?: string } = {}
 ): Promise<{ transactions: Transaction[]; nextCursor: string | null }> {
   const pageSize = Math.min(options.limit ?? 20, 100);
 
-  let query = adminDb
+  const snap = await adminDb
     .collection("transactions")
     .where("userId", "==", userId)
-    .orderBy("dateIn", "desc")
-    .limit(pageSize + 1);
+    .get();
 
-  if (options.cursor) {
-    const cursorDoc = await adminDb.collection("transactions").doc(options.cursor).get();
-    if (cursorDoc.exists) query = query.startAfter(cursorDoc);
-  }
+  // tri en mémoire : pas d'index composite requis
+  const all = snap.docs
+    .map((d) => d.data() as Transaction)
+    .sort((a, b) => (b.dateIn > a.dateIn ? 1 : -1));
 
-  const snap = await query.get();
-  const docs = snap.docs.map((d) => d.data() as Transaction);
-  const hasMore = docs.length > pageSize;
-  const transactions = hasMore ? docs.slice(0, pageSize) : docs;
-  const nextCursor = hasMore ? transactions[transactions.length - 1].id : null;
+  // pagination manuelle par cursor
+  const startIdx = options.cursor
+    ? all.findIndex((t) => t.id === options.cursor) + 1
+    : 0;
 
-  return { transactions, nextCursor };
+  const page = all.slice(startIdx, startIdx + pageSize);
+  const nextCursor =
+    startIdx + pageSize < all.length ? page[page.length - 1].id : null;
+
+  return { transactions: page, nextCursor };
 }
 
 export async function getTransactionById(id: string): Promise<Transaction | null> {
