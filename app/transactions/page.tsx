@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState, useRef, ChangeEvent } from "react";
+import { Fragment, useCallback, useEffect, useState, useRef, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
 import Toast from "@/app/components/Toast";
@@ -15,6 +15,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { parseMt5HistoryText, ParsedOcrTrade } from "@/lib/mt5Ocr";
+import type { Transaction } from "@/lib/transactions";
 
 type Plan = { id: string; title: string };
 type Step = { id: string; title: string };
@@ -75,18 +76,7 @@ export default function TransactionsPage() {
     );
   }
 
-  // liste des transactions ouvertes
-  const [openTx, setOpenTx] = useState<
-    {
-      id: string;
-      asset: string;
-      dateIn: string;
-      timeframe?: string;
-      emotionBefore?: string;
-      planId?: string | null;
-      checkedStepIds?: string[];
-    }[]
-  >([]);
+  const [openTx, setOpenTx] = useState<Transaction[]>([]);
 
   // --- ÉDITION INLINE (ETATS + HANDLERS) ---
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -125,7 +115,7 @@ export default function TransactionsPage() {
     }
   }
 
-  function startEdit(tx: typeof openTx[number]) {
+  function startEdit(tx: Transaction) {
     setEditingId(tx.id);
     setEditAsset(tx.asset ?? "");
     setEditTimeframe(tx.timeframe ?? "");
@@ -335,22 +325,22 @@ export default function TransactionsPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  async function loadTransactions(cursor?: string) {
+  const loadTransactions = useCallback(async (cursor?: string) => {
     const url = cursor
       ? `/api/transactions?limit=20&cursor=${cursor}`
       : "/api/transactions?limit=20";
     const r = await fetch(url, { cache: "no-store" });
     const j = await r.json();
     setNextCursor(j.nextCursor ?? null);
-    return (j.transactions ?? []) as typeof openTx;
-  }
+    return (j.transactions ?? []) as Transaction[];
+  }, []);
 
   useEffect(() => {
     (async () => {
       const txs = await loadTransactions();
       setOpenTx(txs.filter((t) => t.status === "open"));
     })();
-  }, [message]);
+  }, [message, loadTransactions]);
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;

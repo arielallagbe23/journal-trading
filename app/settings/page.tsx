@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation"; // ✅ ajoute ça
 import { ArrowLeft } from "lucide-react"; // ✅ import de l’icône
 
@@ -25,36 +25,16 @@ export default function SettingsPage() {
   const [steps, setSteps] = useState<Step[]>([]);
   const [newStep, setNewStep] = useState("");
 
-  // initial load
-  useEffect(() => {
-    (async () => {
-      await refreshAssets();
-      await refreshPlans();
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (!activePlanId) return;
-    refreshSteps(activePlanId);
-  }, [activePlanId]);
-
-  async function refreshAssets() {
+  const refreshAssets = useCallback(async () => {
     try {
       const r = await fetch("/api/assets", { cache: "no-store" });
-      if (r.status === 401) return router.replace("/login"); // ✅
+      if (r.status === 401) return router.replace("/login");
       const j = await r.json();
       setAssets(Array.isArray(j.assets) ? j.assets : []);
-    } catch {
-      // facultatif: toast/etat d'erreur
-    }
-  }
+    } catch {}
+  }, [router]);
 
-  function normAssetName(s: string) {
-    return s.trim();
-  }
-
-  // refresh plans (gère 401 + activePlanId cohérent)
-  async function refreshPlans() {
+  const refreshPlans = useCallback(async () => {
     try {
       const r = await fetch("/api/plans", { cache: "no-store" });
       if (r.status === 401) return router.replace("/login");
@@ -69,20 +49,34 @@ export default function SettingsPage() {
       }
 
       // si l'actif n'existe plus, sélectionne le premier
-      if (!activePlanId || !list.some((p) => p.id === activePlanId)) {
-        setActivePlanId(list[0].id);
-      }
-    } catch {
-      // option: toast d'erreur
-    }
-  }
+      setActivePlanId((prev) =>
+        !prev || !list.some((p) => p.id === prev) ? list[0].id : prev
+      );
+    } catch {}
+  }, [router]);
 
-  // pense aussi à 401 pour steps (optionnel mais cohérent)
-  async function refreshSteps(planId: string) {
+  const refreshSteps = useCallback(async (planId: string) => {
     const r = await fetch(`/api/plans/${planId}/steps`, { cache: "no-store" });
     if (r.status === 401) return router.replace("/login");
     const j = await r.json();
     setSteps(j.steps ?? []);
+  }, [router]);
+
+  // initial load
+  useEffect(() => {
+    (async () => {
+      await refreshAssets();
+      await refreshPlans();
+    })();
+  }, [refreshAssets, refreshPlans]);
+
+  useEffect(() => {
+    if (!activePlanId) return;
+    refreshSteps(activePlanId);
+  }, [activePlanId, refreshSteps]);
+
+  function normAssetName(s: string) {
+    return s.trim();
   }
 
   // CRUD Assets
