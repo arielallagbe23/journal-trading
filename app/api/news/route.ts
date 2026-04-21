@@ -17,24 +17,41 @@ const FEEDS = [
 ];
 
 const RELEVANT = [
-  "japan", "japanese", "yen", "boj", "bank of japan", "ueda", "tokyo",
+  // Japon / JPY
+  "japan", "japanese", "yen", "boj", "bank of japan", "ueda", "tokyo", "nikkei",
+  // USA / USD
   "dollar", "usd", "fed", "federal reserve", "powell", "trump", "treasury",
-  "china", "chinese", "yuan", "beijing", "xi jinping", "tariff", "trade war",
+  "white house", "washington", "american", "united states",
+  // Chine
+  "china", "chinese", "yuan", "beijing", "xi jinping", "hong kong",
+  // Commerce & politique économique
+  "tariff", "trade war", "trade deal", "trade deficit", "trade surplus",
+  "sanction", "import", "export", "supply chain", "semiconductor",
+  // Macro & marchés
+  "inflation", "recession", "gdp", "rate hike", "rate cut", "interest rate",
+  "monetary policy", "central bank", "yield", "bond", "treasury yield",
+  "unemployment", "jobs report", "payroll", "cpi", "pce", "pmi",
+  "stock market", "equities", "sell-off", "rally", "market crash",
+  "currency", "forex", "exchange rate", "intervention",
+  // Énergie & matières premières
+  "oil", "crude", "opec", "hormuz", "energy", "commodity", "gold",
+  // Géopolitique
   "war", "attack", "military", "strike", "missile", "conflict", "troops",
-  "oil", "crude", "opec", "hormuz", "energy", "sanction",
-  "taiwan", "ukraine", "korea", "iran",
-  "inflation", "recession", "gdp", "rate hike", "rate cut",
+  "taiwan", "ukraine", "korea", "iran", "north korea", "russia",
+  "g7", "g20", "imf", "world bank",
 ];
 
 function tag(text: string): string[] {
   const t = text.toLowerCase();
   const tags: string[] = [];
-  if (/japan|japanese|yen|boj|bank of japan|ueda|tokyo/.test(t))              tags.push("🇯🇵");
-  if (/\bus\b|\busa\b|america|dollar|\bfed\b|federal reserve|powell|trump|treasury/.test(t)) tags.push("🇺🇸");
-  if (/china|chinese|yuan|beijing|xi jinping/.test(t))                        tags.push("🇨🇳");
-  if (/war|attack|military|strike|missile|conflict|troops|invasion/.test(t))  tags.push("⚔️");
-  if (/oil|crude|opec|hormuz|energy/.test(t))                                 tags.push("🛢️");
-  if (/tariff|trade war|sanction|import|export/.test(t))                      tags.push("📊");
+  if (/japan|japanese|yen|boj|bank of japan|ueda|tokyo|nikkei/.test(t))                    tags.push("🇯🇵");
+  if (/\bus\b|\busa\b|america|dollar|\bfed\b|federal reserve|powell|trump|treasury|white house|united states/.test(t)) tags.push("🇺🇸");
+  if (/china|chinese|yuan|beijing|xi jinping|hong kong/.test(t))                           tags.push("🇨🇳");
+  if (/war|attack|military|strike|missile|conflict|troops|invasion|nuclear/.test(t))       tags.push("⚔️");
+  if (/oil|crude|opec|hormuz|energy|commodity|gold/.test(t))                               tags.push("🛢️");
+  if (/tariff|trade war|trade deal|sanction|import|export|supply chain|semiconductor/.test(t)) tags.push("📊");
+  if (/rate|yield|bond|inflation|cpi|pce|pmi|gdp|recession|monetary|central bank/.test(t)) tags.push("🏦");
+  if (/stock|equi|market|sell.off|rally|crash|nikkei|forex|currency|intervention/.test(t)) tags.push("💹");
   return tags;
 }
 
