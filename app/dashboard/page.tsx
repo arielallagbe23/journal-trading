@@ -63,16 +63,7 @@ export default function DashboardPage() {
     );
   }
 
-  // Pendant le chargement OU tant que le user/nickname n'est pas prêt → spinner
-  const isNicknameReady =
-    me &&
-    "authenticated" in me &&
-    me.authenticated === true &&
-    me.user &&
-    typeof me.user.nickname === "string" &&
-    me.user.nickname.length > 0;
-
-  if (loading || !isNicknameReady) {
+  if (loading || !me) {
     return (
       <main className="min-h-screen grid place-items-center bg-gray-950 text-gray-100">
         <LoadingSpinner label="Chargement du profil..." />
@@ -80,8 +71,9 @@ export default function DashboardPage() {
     );
   }
 
-  // Si on arrive ici, on a un utilisateur authentifié et un nickname sûr
-  const nickname = me.user?.nickname ?? "Utilisateur";
+  if (!me.authenticated) return null; // redirect en cours vers /login
+
+  const nickname = me.user?.nickname || "Trader";
   const email = me.user?.email ?? "";
 
   return (
